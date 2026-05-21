@@ -1,6 +1,6 @@
 ///|
 struct ItemRow {
-  id : Int
+  id : String
   title : String
   status : String
   priority : Int
@@ -8,9 +8,15 @@ struct ItemRow {
 
 ///|
 struct EdgeRow {
-  from_id : Int
-  to_id : Int
+  from_id : String
+  to_id : String
   kind : String
+} derive(FromJson)
+
+///|
+struct ExistingItemRow {
+  id : String
+  title : String
 } derive(FromJson)
 
 ///|
@@ -79,6 +85,10 @@ async fn main {
       let focus = get_one(sub, "item")
       println(load_graph(db).outline(focus))
     }
+    "todos" => {
+      let focus = get_one(sub, "item")
+      println(load_graph(db).todos_markdown(focus))
+    }
     "status" => {
       let id = require_one(sub, "item")
       let status = @issues.Status::from_storage(require_one(sub, "status"))
@@ -100,7 +110,7 @@ async fn main {
       println("serving http://\{host}:\{port}")
       serve_dashboard(db, host, port)
     }
-    other => fail("unhandled subcommand: \{other}")
+    other => cli_fail("unhandled subcommand: \{other}")
   }
 }
 
@@ -117,7 +127,7 @@ fn cli_command() -> @argparse.Command {
   @argparse.Command(
     "issues",
     about="SQLite-backed DAG issue tracker for agents and humans.",
-    version="0.1.0",
+    version="0.1.2",
     subcommand_required=true,
     options=[
       @argparse.OptionArg(
@@ -172,6 +182,11 @@ fn cli_command() -> @argparse.Command {
         positionals=[optional_item_arg],
       ),
       @argparse.Command(
+        "todos",
+        about="Print a Markdown task list under the focus item.",
+        positionals=[optional_item_arg],
+      ),
+      @argparse.Command(
         "status",
         about="Set item status: todo, in-progress, or done.",
         positionals=[
@@ -223,28 +238,51 @@ fn get_many(matches : @argparse.Matches, name : String) -> Array[String] {
 }
 
 ///|
-fn require_one(matches : @argparse.Matches, name : String) -> String raise {
+fn require_one(matches : @argparse.Matches, name : String) -> String {
   match get_one(matches, name) {
     Some(value) => value
-    None => fail("missing argument: \{name}")
+    None => cli_fail("missing argument: \{name}")
   }
 }
 
 ///|
+fn[A] cli_fail(message : String) -> A {
+  println(message)
+  @sys.exit(1)
+  panic()
+}
+
+///|
 async fn init_db(db : String) -> Unit {
+  let current_schema = sqlite_scalar(
+    db, "SELECT sql FROM sqlite_master WHERE type='table' AND name='items' LIMIT 1;",
+  )
+  if current_schema.contains("INTEGER PRIMARY KEY") {
+    cli_fail(
+      "existing database uses numeric issue ids; create a new database or migrate it before using deterministic title hashes",
+    )
+  }
   let schema =
     #|PRAGMA foreign_keys = ON;
     #|CREATE TABLE IF NOT EXISTS items (
-    #|  id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #|  id TEXT PRIMARY KEY,
     #|  title TEXT NOT NULL,
     #|  status TEXT NOT NULL DEFAULT 'todo',
     #|  priority INTEGER NOT NULL DEFAULT 0,
     #|  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     #|  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     #|);
+    #|CREATE UNIQUE INDEX IF NOT EXISTS items_title_unique ON items(title);
+    #|CREATE TRIGGER IF NOT EXISTS items_title_immutable
+    #|BEFORE UPDATE OF title ON items
+    #|FOR EACH ROW
+    #|WHEN NEW.title <> OLD.title
+    #|BEGIN
+    #|  SELECT RAISE(ABORT, 'issue titles are immutable; create a new issue with a new title');
+    #|END;
     #|CREATE TABLE IF NOT EXISTS edges (
-    #|  from_id INTEGER NOT NULL,
-    #|  to_id INTEGER NOT NULL,
+    #|  from_id TEXT NOT NULL,
+    #|  to_id TEXT NOT NULL,
     #|  kind TEXT NOT NULL,
     #|  UNIQUE(from_id, to_id, kind),
     #|  CHECK(kind IN ('contains', 'depends_on', 'relates_to')),
@@ -267,10 +305,51 @@ async fn add_item(
   priority : Int,
 ) -> String {
   init_db(db)
-  let quoted_title = sql_quote(title)
-  let quoted_status = sql_quote(status.to_storage())
-  let sql = "INSERT INTO items(title, status, priority) VALUES(\{quoted_title}, \{quoted_status}, \{priority}); SELECT last_insert_rowid();"
-  sqlite_scalar(db, sql)
+  let normalized_title = normalize_title(title)
+  if normalized_title == "" {
+    cli_fail("issue title must not be empty")
+  }
+  let id = issue_id_from_title(normalized_title)
+  let quoted_id = sql_quote(id)
+  let existing : Array[ExistingItemRow] = @json.from_json(
+    sqlite_json(
+      db,
+      "SELECT id, title FROM items WHERE id=\{quoted_id} LIMIT 1;",
+    ),
+  )
+  match existing {
+    [row, ..] =>
+      if row.title == normalized_title {
+        row.id
+      } else {
+        cli_fail(
+          "ISSUE_TITLE_RENAME_REQUIRED: SHA id \{id} already belongs to '\{row.title}'; ask the agent to rename '\{normalized_title}'",
+        )
+      }
+    [] => {
+      let quoted_title = sql_quote(normalized_title)
+      let quoted_status = sql_quote(status.to_storage())
+      ignore(
+        sqlite_exec(
+          db,
+          "INSERT INTO items(id, title, status, priority) VALUES(\{quoted_id}, \{quoted_title}, \{quoted_status}, \{priority});",
+        ),
+      )
+      id
+    }
+  }
+}
+
+///|
+fn normalize_title(title : String) -> String {
+  title.trim().to_owned()
+}
+
+///|
+fn issue_id_from_title(title : String) -> String {
+  let digest = @crypto.sha256(@utf8.encode(title))
+  let hex = @crypto.bytes_to_hex_string(digest)
+  "iss_" + hex.view(end_offset=16).to_owned()
 }
 
 ///|
@@ -337,14 +416,14 @@ async fn load_graph(db : String) -> @issues.IssueGraph {
   )
   {
     items: item_rows.map(row => {
-      id: row.id.to_string(),
+      id: row.id,
       title: row.title,
       status: @issues.Status::from_storage(row.status),
       priority: row.priority,
     }),
     edges: edge_rows.map(row => {
-      from_id: row.from_id.to_string(),
-      to_id: row.to_id.to_string(),
+      from_id: row.from_id,
+      to_id: row.to_id,
       kind: @issues.EdgeKind::from_storage(row.kind),
     }),
     current_id: match state_rows {
@@ -455,7 +534,7 @@ async fn build_dashboard_app() -> String {
     "build", "--target", "js", "dashboard/app",
   ])
   if code != 0 {
-    fail("failed to build dashboard/app: \{stderr.text()}")
+    cli_fail("failed to build dashboard/app: \{stderr.text()}")
   }
   "_build/js/debug/build/dashboard/app/app.js"
 }
@@ -506,7 +585,7 @@ async fn sqlite_stdout_with_args(args : Array[String]) -> String {
   let (code, stdout, stderr) = @process.collect_output("sqlite3", args)
   if code != 0 {
     let err = stderr.text()
-    fail("sqlite3 failed: \{err}")
+    cli_fail("sqlite3 failed: \{err}")
   }
   stdout.text()
 }

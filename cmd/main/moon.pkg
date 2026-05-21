@@ -1,6 +1,7 @@
 import {
   "bobzhang/issues",
   "moonbitlang/core/argparse",
+  "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/strconv",
@@ -9,6 +10,8 @@ import {
   "moonbitlang/async/http",
   "moonbitlang/async/process",
   "moonbitlang/async/socket",
+  "moonbitlang/x/crypto",
+  "moonbitlang/x/sys",
 }
 
 supported_targets = "native"

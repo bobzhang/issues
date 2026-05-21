@@ -10,12 +10,21 @@ Run the CLI through Moon while developing:
 ```bash
 moon run --target native cmd/main -- --db issues.db init
 moon run --target native cmd/main -- --db issues.db add -p 5 Build tracker
-moon run --target native cmd/main -- --db issues.db link -t contains 1 2
-moon run --target native cmd/main -- --db issues.db focus 1
+moon run --target native cmd/main -- --db issues.db add Implement CLI
+moon run --target native cmd/main -- --db issues.db link -t contains iss_21845b479070a3c5 iss_0e62aff88401672c
+moon run --target native cmd/main -- --db issues.db focus iss_21845b479070a3c5
 moon run --target native cmd/main -- --db issues.db next
+moon run --target native cmd/main -- --db issues.db todos
 moon run --target native cmd/main -- --db issues.db outline
 moon run --target native cmd/main -- --db issues.db serve
 ```
+
+Issue IDs are deterministic: `add` trims the title, hashes it with SHA-256, and
+uses the first 16 hex characters with an `iss_` prefix. Titles are immutable;
+to rename an issue, create a new issue with the new title and relink it. Re-adding
+the same title returns the same ID. If the generated SHA ID already belongs to a
+different title, the CLI exits with `ISSUE_TITLE_RENAME_REQUIRED` so an agent can
+choose a more specific title.
 
 Edges are typed:
 
@@ -24,7 +33,8 @@ Edges are typed:
 - `relates_to` for loose references.
 
 `next` returns the highest-priority unfinished, unblocked leaf under the current
-focus item.
+focus item. `todos` renders the current focus as a recursive Markdown task list
+for terminal reading.
 
 ## Dashboard
 

@@ -41,6 +41,7 @@ pub fn IssueGraph::is_blocked(Self, String) -> Bool
 pub fn IssueGraph::next_todo(Self, String?) -> IssueItem?
 pub fn IssueGraph::open_count(Self) -> Int
 pub fn IssueGraph::outline(Self, String?) -> String
+pub fn IssueGraph::todos_markdown(Self, String?) -> String
 
 pub(all) struct IssueItem {
   id : String

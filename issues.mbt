@@ -188,6 +188,17 @@ pub fn IssueGraph::outline(self : IssueGraph, focus : String?) -> String {
 }
 
 ///|
+pub fn IssueGraph::todos_markdown(self : IssueGraph, focus : String?) -> String {
+  let roots = self.outline_roots(focus)
+  let buf = StringBuilder()
+  let seen : Map[String, Unit] = {}
+  for root in roots {
+    write_todo_markdown_node(self, root.id, 0, buf, seen)
+  }
+  buf.to_string()
+}
+
+///|
 pub fn IssueGraph::open_count(self : IssueGraph) -> Int {
   self.items.fold(init=0, (count, item) => {
     if item.status.is_open() {
@@ -320,6 +331,56 @@ fn write_outline_node(
       }
     }
   }
+}
+
+///|
+fn write_todo_markdown_node(
+  graph : IssueGraph,
+  id : String,
+  depth : Int,
+  buf : StringBuilder,
+  seen : Map[String, Unit],
+) -> Unit {
+  let indent = "  ".repeat(depth)
+  if seen.contains(id) {
+    buf.write_string("\{indent}- [ ] #\{id} (cycle)\n")
+    return
+  }
+  seen[id] = ()
+  match graph.find_item(id) {
+    None => buf.write_string("\{indent}- [ ] #\{id} (missing)\n")
+    Some(item) => {
+      buf.write_string(
+        "\{indent}- \{item.status.markdown_checkbox()} #\{item.id} \{item.title}\{todo_markdown_metadata(graph, item)}\n",
+      )
+      for child in graph.contains_children(id) {
+        write_todo_markdown_node(graph, child.id, depth + 1, buf, seen)
+      }
+    }
+  }
+}
+
+///|
+fn Status::markdown_checkbox(self : Status) -> String {
+  match self {
+    Done => "[x]"
+    Todo | InProgress => "[ ]"
+  }
+}
+
+///|
+fn todo_markdown_metadata(graph : IssueGraph, item : IssueItem) -> String {
+  let metadata : Array[String] = ["p\{item.priority}"]
+  if item.status == InProgress {
+    metadata.push("in-progress")
+  }
+  if graph.is_blocked(item.id) {
+    metadata.push("blocked")
+  }
+  if graph.current_id == Some(item.id) {
+    metadata.push("current")
+  }
+  " (" + metadata.join(" ") + ")"
 }
 
 ///|

@@ -61,6 +61,21 @@ test "outline renders contains tree with current and blocked markers" {
 }
 
 ///|
+test "todos markdown renders recursive task list" {
+  inspect(
+    sample_graph().todos_markdown(None),
+    content=(
+      #|- [ ] #1 Build tracker (p5 current)
+      #|  - [ ] #3 Implement CLI (p8)
+      #|  - [ ] #4 Implement dashboard (p6 blocked)
+      #|    - [ ] #5 Pick visual layout (p4)
+      #|  - [x] #2 Design schema (p3)
+      #|
+    ),
+  )
+}
+
+///|
 test "graph json round trip" {
   let graph = sample_graph()
   let json = graph.to_json()
