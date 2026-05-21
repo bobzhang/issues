@@ -1,0 +1,11 @@
+import {
+  "bobzhang/issues",
+  "bobzhang/issues/dashboard",
+  "moonbit-community/rabbita",
+}
+
+supported_targets = "js"
+
+options(
+  "is-main": true,
+)

@@ -1,0 +1,19 @@
+{
+  "name": "bobzhang/issues",
+  "version": "0.1.0",
+  "deps": {
+    "moonbit-community/rabbita": "0.12.2",
+    "moonbitlang/async": "0.18.1"
+  },
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/bobzhang/issues",
+  "license": "Apache-2.0",
+  "keywords": [
+    "issues",
+    "sqlite",
+    "dag",
+    "cli",
+    "dashboard"
+  ],
+  "description": "SQLite-backed DAG issue tracker with a MoonBit CLI and Rabbit Tea dashboard."
+}

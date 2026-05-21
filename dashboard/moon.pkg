@@ -1,0 +1,10 @@
+import {
+  "bobzhang/issues",
+  "moonbit-community/rabbita",
+  "moonbit-community/rabbita/html",
+  "moonbitlang/core/json",
+}
+
+supported_targets = "js+native"
+
+warnings = "-alert_unstable"

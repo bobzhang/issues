@@ -1,0 +1,64 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "bobzhang/issues"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum EdgeKind {
+  Contains
+  DependsOn
+  RelatesTo
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn EdgeKind::from_storage(String) -> Self raise
+pub fn EdgeKind::to_storage(Self) -> String
+
+pub(all) struct IssueEdge {
+  from_id : String
+  to_id : String
+  kind : EdgeKind
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct IssueGraph {
+  items : Array[IssueItem]
+  edges : Array[IssueEdge]
+  current_id : String?
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn IssueGraph::blocked_count(Self) -> Int
+pub fn IssueGraph::contains_children(Self, String) -> Array[IssueItem]
+pub fn IssueGraph::dependencies(Self, String) -> Array[IssueItem]
+pub fn IssueGraph::edge_count(Self, EdgeKind) -> Int
+pub fn IssueGraph::empty() -> Self
+pub fn IssueGraph::find_item(Self, String) -> IssueItem?
+pub fn IssueGraph::has_open_child(Self, String) -> Bool
+pub fn IssueGraph::is_blocked(Self, String) -> Bool
+pub fn IssueGraph::next_todo(Self, String?) -> IssueItem?
+pub fn IssueGraph::open_count(Self) -> Int
+pub fn IssueGraph::outline(Self, String?) -> String
+
+pub(all) struct IssueItem {
+  id : String
+  title : String
+  status : Status
+  priority : Int
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Status {
+  Todo
+  InProgress
+  Done
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Status::from_storage(String) -> Self raise
+pub fn Status::is_open(Self) -> Bool
+pub fn Status::to_storage(Self) -> String
+
+// Type aliases
+
+// Traits
+
