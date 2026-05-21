@@ -7,13 +7,16 @@ using @html {
   h2,
   h3,
   header,
+  input,
   li,
   main_,
+  nothing,
   p,
   section,
   span,
   strong,
   text,
+  textarea,
   ul,
 }
 
@@ -21,34 +24,203 @@ using @html {
 pub(all) struct Model {
   graph : @issues.IssueGraph
   selected_id : String?
+  editable : Bool
+  body_draft : String
+  status_draft : String
+  evidence_draft : String
+  note_draft : String
+  notice : String
 } derive(Debug)
 
 ///|
 pub(all) enum Msg {
   Select(String)
+  BodyChanged(String)
+  StatusChanged(String)
+  EvidenceChanged(String)
+  NoteChanged(String)
+  SaveBody
+  SaveStatus
+  AddNote
+  GraphSaved(Result[@issues.IssueGraph, Error])
 } derive(Debug)
 
 ///|
-pub fn app(graph : @issues.IssueGraph) -> @rabbita.Cell {
-  @rabbita.simple_cell(
-    model={ graph, selected_id: graph.next_todo(None).map(item => item.id) },
-    update=(msg, model) => {
-      match msg {
-        Select(id) => { ..model, selected_id: Some(id) }
-      }
-    },
-    view~,
-  )
+struct BodyPayload {
+  id : String
+  body : String
+} derive(ToJson)
+
+///|
+struct NotePayload {
+  id : String
+  body : String
+} derive(ToJson)
+
+///|
+struct StatusPayload {
+  id : String
+  status : String
+  evidence : String
+} derive(ToJson)
+
+///|
+pub fn app(
+  graph : @issues.IssueGraph,
+  editable? : Bool = true,
+) -> @rabbita.Cell {
+  @rabbita.cell(model=initial_model(graph, editable), update~, view~)
 }
 
 ///|
 pub fn render_static(graph : @issues.IssueGraph) -> String {
-  @rabbita.render_to_string(app(graph))
+  @rabbita.render_to_string(app(graph, editable=false))
 }
 
 ///|
 pub fn graph_from_json_string(source : String) -> @issues.IssueGraph raise {
   @json.from_json(@json.parse(source))
+}
+
+///|
+fn initial_model(graph : @issues.IssueGraph, editable : Bool) -> Model {
+  hydrate_editor({
+    graph,
+    selected_id: graph.next_todo(None).map(item => item.id),
+    editable,
+    body_draft: "",
+    status_draft: "todo",
+    evidence_draft: "",
+    note_draft: "",
+    notice: "",
+  })
+}
+
+///|
+fn update(
+  emit : @rabbita.Emit[Msg],
+  msg : Msg,
+  model : Model,
+) -> (@rabbita.Cmd, Model) {
+  match msg {
+    Select(id) =>
+      (
+        @rabbita.none,
+        hydrate_editor({
+          ..model,
+          selected_id: Some(id),
+          evidence_draft: "",
+          note_draft: "",
+          notice: "",
+        }),
+      )
+    BodyChanged(value) => (@rabbita.none, { ..model, body_draft: value })
+    StatusChanged(value) => (@rabbita.none, { ..model, status_draft: value })
+    EvidenceChanged(value) =>
+      (@rabbita.none, { ..model, evidence_draft: value })
+    NoteChanged(value) => (@rabbita.none, { ..model, note_draft: value })
+    SaveBody =>
+      if !model.editable {
+        (@rabbita.none, model)
+      } else {
+        match model.selected_id {
+          Some(id) => {
+            let payload : BodyPayload = { id, body: model.body_draft }
+            (
+              @http.post("/api/body")
+              .with_json(payload)
+              .expect_json(result => emit(GraphSaved(result))),
+              { ..model, notice: "Saving body..." },
+            )
+          }
+          None => (@rabbita.none, { ..model, notice: "Select an issue first." })
+        }
+      }
+    SaveStatus =>
+      if !model.editable {
+        (@rabbita.none, model)
+      } else if model.status_draft == "done" &&
+        model.evidence_draft.trim().to_owned() == "" {
+        (@rabbita.none, { ..model, notice: "Done status requires evidence." })
+      } else {
+        match model.selected_id {
+          Some(id) => {
+            let payload : StatusPayload = {
+              id,
+              status: model.status_draft,
+              evidence: model.evidence_draft,
+            }
+            (
+              @http.post("/api/status")
+              .with_json(payload)
+              .expect_json(result => emit(GraphSaved(result))),
+              { ..model, notice: "Saving status..." },
+            )
+          }
+          None => (@rabbita.none, { ..model, notice: "Select an issue first." })
+        }
+      }
+    AddNote =>
+      if !model.editable {
+        (@rabbita.none, model)
+      } else if model.note_draft.trim().to_owned() == "" {
+        (@rabbita.none, { ..model, notice: "Note must not be empty." })
+      } else {
+        match model.selected_id {
+          Some(id) => {
+            let payload : NotePayload = { id, body: model.note_draft }
+            (
+              @http.post("/api/note")
+              .with_json(payload)
+              .expect_json(result => emit(GraphSaved(result))),
+              { ..model, notice: "Adding note..." },
+            )
+          }
+          None => (@rabbita.none, { ..model, notice: "Select an issue first." })
+        }
+      }
+    GraphSaved(result) =>
+      match result {
+        Ok(graph) =>
+          (
+            @rabbita.none,
+            hydrate_editor({
+              ..model,
+              graph,
+              evidence_draft: "",
+              note_draft: "",
+              notice: "Saved.",
+            }),
+          )
+        Err(_) => (@rabbita.none, { ..model, notice: "Request failed." })
+      }
+  }
+}
+
+///|
+fn hydrate_editor(model : Model) -> Model {
+  let selected_id = match model.selected_id {
+    Some(id) =>
+      match model.graph.find_item(id) {
+        Some(_) => Some(id)
+        None => model.graph.next_todo(None).map(item => item.id)
+      }
+    None => model.graph.next_todo(None).map(item => item.id)
+  }
+  let model = { ..model, selected_id, }
+  match selected_id {
+    Some(id) =>
+      match model.graph.find_item(id) {
+        Some(item) =>
+          {
+            ..model,
+            body_draft: item.body,
+            status_draft: status_storage(item.status),
+          }
+        None => model
+      }
+    None => { ..model, body_draft: "", status_draft: "todo" }
+  }
 }
 
 ///|
@@ -76,7 +248,7 @@ fn view(emit : @rabbita.Emit[Msg], model : Model) -> @html.Html {
       ]),
       section(style=detail_style(), [
         h2(style=panel_title_style(), "Selected"),
-        detail_view(graph, model.selected_id),
+        detail_view(emit, model),
       ]),
     ]),
   ])
@@ -128,8 +300,9 @@ fn outline_node(
 }
 
 ///|
-fn detail_view(graph : @issues.IssueGraph, selected_id : String?) -> @html.Html {
-  let selected = match selected_id {
+fn detail_view(emit : @rabbita.Emit[Msg], model : Model) -> @html.Html {
+  let graph = model.graph
+  let selected = match model.selected_id {
     Some(id) => graph.find_item(id)
     None => graph.next_todo(None)
   }
@@ -161,21 +334,128 @@ fn detail_view(graph : @issues.IssueGraph, selected_id : String?) -> @html.Html 
           style=["margin: 0 0 18px", "color: #53606f"],
           "Priority \{item.priority}",
         ),
-        if item.body.trim().to_owned() == "" {
-          p(style=["display: none"], "")
+        if model.editable {
+          div([
+            notice_view(model.notice),
+            body_editor(emit, model),
+            status_editor(emit, model),
+            note_editor(emit, model),
+          ])
         } else {
-          p(
-            style=[
-              "margin: 0 0 18px", "color: #374151", "white-space: pre-wrap", "line-height: 1.5",
-            ],
-            item.body,
-          )
+          readonly_body(item)
         },
         relation_list("Subtasks", graph.contains_children(item.id)),
         relation_list("Dependencies", graph.dependencies(item.id)),
       ])
     }
   }
+}
+
+///|
+fn readonly_body(item : @issues.IssueItem) -> @html.Html {
+  if item.body.trim().to_owned() == "" {
+    p(style=["display: none"], "")
+  } else {
+    p(
+      style=[
+        "margin: 0 0 18px", "color: #374151", "white-space: pre-wrap", "line-height: 1.5",
+      ],
+      item.body,
+    )
+  }
+}
+
+///|
+fn notice_view(message : String) -> @html.Html {
+  if message == "" {
+    p(style=["display: none"], "")
+  } else {
+    p(style=notice_style(), message)
+  }
+}
+
+///|
+fn body_editor(emit : @rabbita.Emit[Msg], model : Model) -> @html.Html {
+  section(style=editor_section_style(), [
+    h3(style=editor_title_style(), "Body"),
+    textarea(
+      value=model.body_draft,
+      rows=8,
+      placeholder="Describe current context, acceptance criteria, or working notes.",
+      on_input=value => emit(BodyChanged(value)),
+      style=textarea_style(),
+      nothing,
+    ),
+    div(style=action_row_style(), [
+      button(on_click=emit(SaveBody), style=primary_button_style(), "Save body"),
+    ]),
+  ])
+}
+
+///|
+fn status_editor(emit : @rabbita.Emit[Msg], model : Model) -> @html.Html {
+  section(style=editor_section_style(), [
+    h3(style=editor_title_style(), "Status"),
+    div(style=["display: flex", "gap: 8px", "flex-wrap: wrap"], [
+      status_choice(emit, model.status_draft, "todo", "Todo"),
+      status_choice(emit, model.status_draft, "in-progress", "In progress"),
+      status_choice(emit, model.status_draft, "done", "Done"),
+    ]),
+    textarea(
+      value=model.evidence_draft,
+      rows=3,
+      placeholder=if model.status_draft == "done" {
+        "Evidence required when marking done."
+      } else {
+        "Optional status note."
+      },
+      on_input=value => emit(EvidenceChanged(value)),
+      style=textarea_style(),
+      nothing,
+    ),
+    div(style=action_row_style(), [
+      button(
+        on_click=emit(SaveStatus),
+        style=primary_button_style(),
+        "Save status",
+      ),
+    ]),
+  ])
+}
+
+///|
+fn note_editor(emit : @rabbita.Emit[Msg], model : Model) -> @html.Html {
+  section(style=editor_section_style(), [
+    h3(style=editor_title_style(), "Note"),
+    input(
+      value=model.note_draft,
+      placeholder="Append an event note.",
+      on_input=value => emit(NoteChanged(value)),
+      style=input_style(),
+      nothing,
+    ),
+    div(style=action_row_style(), [
+      button(on_click=emit(AddNote), style=secondary_button_style(), "Add note"),
+    ]),
+  ])
+}
+
+///|
+fn status_choice(
+  emit : @rabbita.Emit[Msg],
+  current : String,
+  value : String,
+  label : String,
+) -> @html.Html {
+  button(
+    on_click=emit(StatusChanged(value)),
+    style=if current == value {
+      selected_button_style()
+    } else {
+      secondary_button_style()
+    },
+    label,
+  )
 }
 
 ///|
@@ -248,6 +528,15 @@ fn status_label(status : @issues.Status) -> String {
   match status {
     Todo => "todo"
     InProgress => "active"
+    Done => "done"
+  }
+}
+
+///|
+fn status_storage(status : @issues.Status) -> String {
+  match status {
+    Todo => "todo"
+    InProgress => "in-progress"
     Done => "done"
   }
 }
@@ -335,5 +624,69 @@ fn panel_title_style() -> Array[String] {
   [
     "font-size: 14px", "text-transform: uppercase", "letter-spacing: 0", "color: #475569",
     "margin: 0 0 12px",
+  ]
+}
+
+///|
+fn editor_section_style() -> Array[String] {
+  ["border-top: 1px solid #e5e7eb", "padding-top: 14px", "margin-top: 14px"]
+}
+
+///|
+fn editor_title_style() -> Array[String] {
+  ["font-size: 14px", "margin: 0 0 8px", "color: #1f2937"]
+}
+
+///|
+fn textarea_style() -> Array[String] {
+  [
+    "display: block", "width: 100%", "box-sizing: border-box", "border: 1px solid #cbd5e1",
+    "padding: 10px", "font: inherit", "line-height: 1.45", "resize: vertical", "background: #ffffff",
+    "color: #111827",
+  ]
+}
+
+///|
+fn input_style() -> Array[String] {
+  [
+    "display: block", "width: 100%", "box-sizing: border-box", "border: 1px solid #cbd5e1",
+    "padding: 9px 10px", "font: inherit", "background: #ffffff", "color: #111827",
+  ]
+}
+
+///|
+fn action_row_style() -> Array[String] {
+  ["display: flex", "gap: 8px", "align-items: center", "margin-top: 10px"]
+}
+
+///|
+fn primary_button_style() -> Array[String] {
+  [
+    "border: 1px solid #111827", "background: #111827", "color: #ffffff", "padding: 8px 10px",
+    "font-weight: 600", "cursor: pointer",
+  ]
+}
+
+///|
+fn secondary_button_style() -> Array[String] {
+  [
+    "border: 1px solid #cbd5e1", "background: #ffffff", "color: #111827", "padding: 8px 10px",
+    "font-weight: 600", "cursor: pointer",
+  ]
+}
+
+///|
+fn selected_button_style() -> Array[String] {
+  [
+    "border: 1px solid #2563eb", "background: #eff6ff", "color: #1d4ed8", "padding: 8px 10px",
+    "font-weight: 700", "cursor: pointer",
+  ]
+}
+
+///|
+fn notice_style() -> Array[String] {
+  [
+    "margin: 0 0 14px", "border: 1px solid #cbd5e1", "background: #f8fafc", "color: #334155",
+    "padding: 8px 10px",
   ]
 }

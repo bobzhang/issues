@@ -71,6 +71,25 @@ struct StateRow {
 } derive(FromJson)
 
 ///|
+struct BodyPayload {
+  id : String
+  body : String
+} derive(FromJson)
+
+///|
+struct NotePayload {
+  id : String
+  body : String
+} derive(FromJson)
+
+///|
+struct StatusPayload {
+  id : String
+  status : String
+  evidence : String
+} derive(FromJson)
+
+///|
 async fn main {
   let command = cli_command()
   let matches = command.parse(env=@env.get_env_vars())
@@ -229,7 +248,7 @@ fn cli_command() -> @argparse.Command {
   @argparse.Command(
     "issues",
     about="SQLite-backed DAG issue tracker for agents and humans.",
-    version="0.1.3",
+    version="0.1.4",
     subcommand_required=true,
     options=[
       @argparse.OptionArg(
@@ -1237,47 +1256,90 @@ async fn serve_dashboard(db : String, host : String, port : Int) -> Unit {
   let server = @http.Server(addr, reuse_addr=true, headers={
     "Cache-Control": "no-store",
   })
-  server.run_forever((request, _body, conn) => {
-    guard request.meth is Get else {
-      send_text(
-        conn, 405, "Method Not Allowed", "method not allowed\n", "text/plain",
-      )
-      return
-    }
+  server.run_forever((request, body, conn) => {
     let path = strip_query(request.path)
-    match path {
-      "/" | "/index.html" =>
-        send_text(conn, 200, "OK", dashboard_html(), "text/html")
-      "/app.js" => send_text(conn, 200, "OK", app_js, "text/javascript")
-      "/data.js" => {
-        let graph = load_graph(db)
-        let body = "window.__ISSUES_DATA__ = \{graph.to_json().stringify(indent=2)};\n"
-        send_text(conn, 200, "OK", body, "text/javascript")
-      }
-      "/api/graph" => {
-        let graph = load_graph(db)
+    match request.meth {
+      Get => serve_dashboard_get(db, app_js, path, conn)
+      Post => serve_dashboard_post(db, path, body, conn)
+      _ =>
         send_text(
-          conn,
-          200,
-          "OK",
-          graph.to_json().stringify(indent=2) + "\n",
-          "application/json",
+          conn, 405, "Method Not Allowed", "method not allowed\n", "text/plain",
         )
-      }
-      "/api/next" => {
-        let graph = load_graph(db)
-        let body = match graph.next_todo(None) {
-          Some(item) => item.to_json().stringify(indent=2) + "\n"
-          None => "null\n"
-        }
-        send_text(conn, 200, "OK", body, "application/json")
-      }
-      "/api/outline" =>
-        send_text(conn, 200, "OK", load_graph(db).outline(None), "text/plain")
-      "/healthz" => send_text(conn, 200, "OK", "ok\n", "text/plain")
-      _ => send_text(conn, 404, "Not Found", "not found\n", "text/plain")
     }
   })
+}
+
+///|
+async fn serve_dashboard_get(
+  db : String,
+  app_js : String,
+  path : String,
+  conn : @http.ServerConnection,
+) -> Unit {
+  match path {
+    "/" | "/index.html" =>
+      send_text(conn, 200, "OK", dashboard_html(), "text/html")
+    "/app.js" => send_text(conn, 200, "OK", app_js, "text/javascript")
+    "/data.js" => {
+      let graph = load_graph(db)
+      let body = "window.__ISSUES_DATA__ = \{graph.to_json().stringify(indent=2)};\n"
+      send_text(conn, 200, "OK", body, "text/javascript")
+    }
+    "/api/graph" => send_graph_json(db, conn)
+    "/api/next" => {
+      let graph = load_graph(db)
+      let body = match graph.next_todo(None) {
+        Some(item) => item.to_json().stringify(indent=2) + "\n"
+        None => "null\n"
+      }
+      send_text(conn, 200, "OK", body, "application/json")
+    }
+    "/api/outline" =>
+      send_text(conn, 200, "OK", load_graph(db).outline(None), "text/plain")
+    "/healthz" => send_text(conn, 200, "OK", "ok\n", "text/plain")
+    _ => send_text(conn, 404, "Not Found", "not found\n", "text/plain")
+  }
+}
+
+///|
+async fn serve_dashboard_post(
+  db : String,
+  path : String,
+  body : &@io.Reader,
+  conn : @http.ServerConnection,
+) -> Unit {
+  let json = @json.parse(body.read_all().text())
+  match path {
+    "/api/body" => {
+      let payload : BodyPayload = @json.from_json(json)
+      set_body(db, payload.id, payload.body)
+      send_graph_json(db, conn)
+    }
+    "/api/note" => {
+      let payload : NotePayload = @json.from_json(json)
+      add_note(db, payload.id, payload.body)
+      send_graph_json(db, conn)
+    }
+    "/api/status" => {
+      let payload : StatusPayload = @json.from_json(json)
+      let status = @issues.Status::from_storage(payload.status)
+      set_status(db, payload.id, status, Some(payload.evidence))
+      send_graph_json(db, conn)
+    }
+    _ => send_text(conn, 404, "Not Found", "not found\n", "text/plain")
+  }
+}
+
+///|
+async fn send_graph_json(db : String, conn : @http.ServerConnection) -> Unit {
+  let graph = load_graph(db)
+  send_text(
+    conn,
+    200,
+    "OK",
+    graph.to_json().stringify(indent=2) + "\n",
+    "application/json",
+  )
 }
 
 ///|

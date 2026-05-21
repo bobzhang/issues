@@ -80,7 +80,14 @@ Then open `http://127.0.0.1:8080`. The service exposes:
 - `/api/graph` for graph JSON.
 - `/api/next` for the next actionable todo as JSON.
 - `/api/outline` for the text outline.
+- `POST /api/body` to update mutable issue body text.
+- `POST /api/status` to update mutable status; `done` requires evidence.
+- `POST /api/note` to append an issue note.
 - `/healthz` for a simple health check.
+
+The live dashboard can edit body text, status, and append-only notes. Issue
+titles remain immutable: the UI only displays them, and the service has no title
+mutation endpoint.
 
 ## Validation
 

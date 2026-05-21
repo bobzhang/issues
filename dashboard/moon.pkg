@@ -2,9 +2,10 @@ import {
   "bobzhang/issues",
   "moonbit-community/rabbita",
   "moonbit-community/rabbita/html",
+  "moonbit-community/rabbita/http",
   "moonbitlang/core/json",
 }
 
-supported_targets = "js+native"
+supported_targets = "js"
 
 warnings = "-alert_unstable"

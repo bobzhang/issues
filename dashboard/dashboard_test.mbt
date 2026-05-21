@@ -22,6 +22,7 @@ test "static render includes outline and selected item" {
   assert_true(html.contains("Issues Dashboard"))
   assert_true(html.contains("Build tracker"))
   assert_true(html.contains("Implement CLI"))
+  assert_false(html.contains("Save body"))
 }
 
 ///|
