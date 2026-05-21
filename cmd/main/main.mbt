@@ -94,6 +94,12 @@ async fn main {
       write_dashboard_files(db, out_dir)
       println("wrote \{out_dir}")
     }
+    "serve" => {
+      let host = get_one(sub, "host").unwrap_or("127.0.0.1")
+      let port : Int = @strconv.from_str(get_one(sub, "port").unwrap_or("8080"))
+      println("serving http://\{host}:\{port}")
+      serve_dashboard(db, host, port)
+    }
     other => fail("unhandled subcommand: \{other}")
   }
 }
@@ -183,6 +189,16 @@ fn cli_command() -> @argparse.Command {
         options=[
           @argparse.OptionArg("out", long="out", default_values=[
             "dashboard-dist",
+          ]),
+        ],
+      ),
+      @argparse.Command(
+        "serve",
+        about="Serve the dashboard and graph JSON from SQLite.",
+        options=[
+          @argparse.OptionArg("host", long="host", default_values=["127.0.0.1"]),
+          @argparse.OptionArg("port", long="port", short='p', default_values=[
+            "8080",
           ]),
         ],
       ),
@@ -358,6 +374,79 @@ async fn write_dashboard_files(db : String, out_dir : String) -> Unit {
     @fs.read_file(app_js_path),
     create_mode=CreateOrTruncate,
   )
+}
+
+///|
+async fn serve_dashboard(db : String, host : String, port : Int) -> Unit {
+  init_db(db)
+  let app_js = @fs.read_file(build_dashboard_app()).text()
+  let addr = @socket.Addr::parse("\{host}:\{port}")
+  let server = @http.Server(addr, reuse_addr=true, headers={
+    "Cache-Control": "no-store",
+  })
+  server.run_forever((request, _body, conn) => {
+    guard request.meth is Get else {
+      send_text(
+        conn, 405, "Method Not Allowed", "method not allowed\n", "text/plain",
+      )
+      return
+    }
+    let path = strip_query(request.path)
+    match path {
+      "/" | "/index.html" =>
+        send_text(conn, 200, "OK", dashboard_html(), "text/html")
+      "/app.js" => send_text(conn, 200, "OK", app_js, "text/javascript")
+      "/data.js" => {
+        let graph = load_graph(db)
+        let body = "window.__ISSUES_DATA__ = \{graph.to_json().stringify(indent=2)};\n"
+        send_text(conn, 200, "OK", body, "text/javascript")
+      }
+      "/api/graph" => {
+        let graph = load_graph(db)
+        send_text(
+          conn,
+          200,
+          "OK",
+          graph.to_json().stringify(indent=2) + "\n",
+          "application/json",
+        )
+      }
+      "/api/next" => {
+        let graph = load_graph(db)
+        let body = match graph.next_todo(None) {
+          Some(item) => item.to_json().stringify(indent=2) + "\n"
+          None => "null\n"
+        }
+        send_text(conn, 200, "OK", body, "application/json")
+      }
+      "/api/outline" =>
+        send_text(conn, 200, "OK", load_graph(db).outline(None), "text/plain")
+      "/healthz" => send_text(conn, 200, "OK", "ok\n", "text/plain")
+      _ => send_text(conn, 404, "Not Found", "not found\n", "text/plain")
+    }
+  })
+}
+
+///|
+fn strip_query(path : String) -> String {
+  match path.split_once("?") {
+    Some((head, _)) => head.to_owned()
+    None => path
+  }
+}
+
+///|
+async fn send_text(
+  conn : @http.ServerConnection,
+  code : Int,
+  reason : String,
+  body : String,
+  content_type : String,
+) -> Unit {
+  conn
+  ..send_response(code, reason, extra_headers={ "Content-Type": content_type })
+  ..write(body)
+  .end_response()
 }
 
 ///|

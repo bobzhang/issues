@@ -6,7 +6,9 @@ import {
   "moonbitlang/core/strconv",
   "moonbitlang/async",
   "moonbitlang/async/fs",
+  "moonbitlang/async/http",
   "moonbitlang/async/process",
+  "moonbitlang/async/socket",
 }
 
 supported_targets = "native"

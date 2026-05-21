@@ -14,6 +14,7 @@ moon run --target native cmd/main -- --db issues.db link -t contains 1 2
 moon run --target native cmd/main -- --db issues.db focus 1
 moon run --target native cmd/main -- --db issues.db next
 moon run --target native cmd/main -- --db issues.db outline
+moon run --target native cmd/main -- --db issues.db serve
 ```
 
 Edges are typed:
@@ -35,6 +36,21 @@ moon run --target native cmd/main -- --db issues.db dashboard --out dashboard-di
 
 Open `dashboard-dist/index.html` in a browser. The command writes `data.js`,
 builds the MoonBit/Rabbit Tea JS app, and copies it to `app.js`.
+
+For a live local viewer backed by SQLite, run:
+
+```bash
+moon run --target native cmd/main -- --db issues.db serve --port 8080
+```
+
+Then open `http://127.0.0.1:8080`. The service exposes:
+
+- `/` and `/index.html` for the dashboard.
+- `/data.js` for the dashboard bootstrap data.
+- `/api/graph` for graph JSON.
+- `/api/next` for the next actionable todo as JSON.
+- `/api/outline` for the text outline.
+- `/healthz` for a simple health check.
 
 ## Validation
 
