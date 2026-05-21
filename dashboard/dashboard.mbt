@@ -161,6 +161,16 @@ fn detail_view(graph : @issues.IssueGraph, selected_id : String?) -> @html.Html 
           style=["margin: 0 0 18px", "color: #53606f"],
           "Priority \{item.priority}",
         ),
+        if item.body.trim().to_owned() == "" {
+          p(style=["display: none"], "")
+        } else {
+          p(
+            style=[
+              "margin: 0 0 18px", "color: #374151", "white-space: pre-wrap", "line-height: 1.5",
+            ],
+            item.body,
+          )
+        },
         relation_list("Subtasks", graph.contains_children(item.id)),
         relation_list("Dependencies", graph.dependencies(item.id)),
       ])

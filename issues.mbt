@@ -68,6 +68,7 @@ pub fn EdgeKind::to_storage(self : EdgeKind) -> String {
 pub(all) struct IssueItem {
   id : String
   title : String
+  body : String
   status : Status
   priority : Int
 } derive(Eq, Debug, ToJson, FromJson)
@@ -159,21 +160,55 @@ pub fn IssueGraph::has_open_child(self : IssueGraph, id : String) -> Bool {
 
 ///|
 pub fn IssueGraph::next_todo(self : IssueGraph, focus : String?) -> IssueItem? {
+  let candidates = self.ready_todos(focus)
+  candidates.sort_by(compare_next_candidate)
+  match candidates {
+    [first, ..] => Some(first)
+    [] => None
+  }
+}
+
+///|
+pub fn IssueGraph::scoped_items(
+  self : IssueGraph,
+  focus : String?,
+) -> Array[IssueItem] {
   let scoped = self.scoped_item_ids(focus)
+  let items = self.items.filter(item => scoped.contains(item.id))
+  sort_items_for_display(items)
+  items
+}
+
+///|
+pub fn IssueGraph::ready_todos(
+  self : IssueGraph,
+  focus : String?,
+) -> Array[IssueItem] {
   let candidates : Array[IssueItem] = []
-  for item in self.items {
-    if scoped.contains(item.id) &&
-      item.status.is_open() &&
+  for item in self.scoped_items(focus) {
+    if item.status.is_open() &&
       !self.is_blocked(item.id) &&
       !self.has_open_child(item.id) {
       candidates.push(item)
     }
   }
   candidates.sort_by(compare_next_candidate)
-  match candidates {
-    [first, ..] => Some(first)
-    [] => None
+  candidates
+}
+
+///|
+pub fn IssueGraph::blocked_todos(
+  self : IssueGraph,
+  focus : String?,
+) -> Array[IssueItem] {
+  let blocked : Array[IssueItem] = []
+  for item in self.scoped_items(focus) {
+    if item.status.is_open() && self.is_blocked(item.id) {
+      blocked.push(item)
+    }
   }
+  sort_items_for_display(blocked)
+  blocked
 }
 
 ///|
@@ -196,6 +231,30 @@ pub fn IssueGraph::todos_markdown(self : IssueGraph, focus : String?) -> String 
     write_todo_markdown_node(self, root.id, 0, buf, seen)
   }
   buf.to_string()
+}
+
+///|
+pub fn IssueGraph::ready_todos_markdown(
+  self : IssueGraph,
+  focus : String?,
+) -> String {
+  self.items_markdown(self.ready_todos(focus))
+}
+
+///|
+pub fn IssueGraph::blocked_todos_markdown(
+  self : IssueGraph,
+  focus : String?,
+) -> String {
+  self.items_markdown(self.blocked_todos(focus))
+}
+
+///|
+pub fn IssueGraph::all_todos_markdown(
+  self : IssueGraph,
+  focus : String?,
+) -> String {
+  self.items_markdown(self.scoped_items(focus))
 }
 
 ///|
@@ -358,6 +417,20 @@ fn write_todo_markdown_node(
       }
     }
   }
+}
+
+///|
+fn IssueGraph::items_markdown(
+  self : IssueGraph,
+  items : Array[IssueItem],
+) -> String {
+  let buf = StringBuilder()
+  for item in items {
+    buf.write_string(
+      "- \{item.status.markdown_checkbox()} #\{item.id} \{item.title}\{todo_markdown_metadata(self, item)}\n",
+    )
+  }
+  buf.to_string()
 }
 
 ///|

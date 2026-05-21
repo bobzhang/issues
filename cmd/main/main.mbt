@@ -2,6 +2,15 @@
 struct ItemRow {
   id : String
   title : String
+  body : String
+  status : String
+  priority : Int
+} derive(FromJson)
+
+///|
+struct LegacyItemRow {
+  id : Int
+  title : String
   status : String
   priority : Int
 } derive(FromJson)
@@ -14,9 +23,46 @@ struct EdgeRow {
 } derive(FromJson)
 
 ///|
+struct LegacyEdgeRow {
+  from_id : Int
+  to_id : Int
+  kind : String
+} derive(FromJson)
+
+///|
 struct ExistingItemRow {
   id : String
   title : String
+} derive(FromJson)
+
+///|
+struct ColumnRow {
+  name : String
+} derive(FromJson)
+
+///|
+struct NoteRow {
+  note_id : Int
+  body : String
+  created_at : String
+} derive(FromJson)
+
+///|
+struct EventRow {
+  event_id : Int
+  item_id : String
+  event_type : String
+  agent : String
+  body : String
+  created_at : String
+} derive(FromJson)
+
+///|
+struct ClaimRow {
+  item_id : String
+  agent : String
+  claimed_at : String
+  lease_until : String
 } derive(FromJson)
 
 ///|
@@ -46,7 +92,8 @@ async fn main {
       let priority : Int = @strconv.from_str(
         get_one(sub, "priority").unwrap_or("0"),
       )
-      let id = add_item(db, title, status, priority)
+      let body = get_one(sub, "body").unwrap_or("")
+      let id = add_item(db, title, body, status, priority)
       println(id)
     }
     "link" => {
@@ -87,13 +134,68 @@ async fn main {
     }
     "todos" => {
       let focus = get_one(sub, "item")
-      println(load_graph(db).todos_markdown(focus))
+      let graph = load_graph(db)
+      if get_flag(sub, "ready") {
+        println(graph.ready_todos_markdown(focus))
+      } else if get_flag(sub, "blocked") {
+        println(graph.blocked_todos_markdown(focus))
+      } else if get_flag(sub, "all") {
+        println(graph.all_todos_markdown(focus))
+      } else {
+        println(graph.todos_markdown(focus))
+      }
+    }
+    "show" => {
+      let id = require_one(sub, "item")
+      println(show_item(db, id))
+    }
+    "body" => {
+      let id = require_one(sub, "item")
+      let body = get_many(sub, "body").join(" ")
+      set_body(db, id, body)
+      println("updated #\{id} body")
+    }
+    "note" => {
+      let id = require_one(sub, "item")
+      let body = get_many(sub, "note").join(" ")
+      add_note(db, id, body)
+      println("noted #\{id}")
+    }
+    "claim" => {
+      let id = require_one(sub, "item")
+      let agent = require_one(sub, "agent")
+      let ttl_minutes : Int = @strconv.from_str(
+        get_one(sub, "ttl-minutes").unwrap_or("0"),
+      )
+      claim_item(db, id, agent, ttl_minutes)
+      println("claimed #\{id} by \{agent}")
+    }
+    "release" => {
+      let id = require_one(sub, "item")
+      let agent = get_one(sub, "agent").unwrap_or("")
+      release_item(db, id, agent)
+      println("released #\{id}")
+    }
+    "done" => {
+      let id = require_one(sub, "item")
+      let evidence = get_many(sub, "evidence").join(" ")
+      set_status(db, id, Done, Some(evidence))
+      println("#\{id} done")
     }
     "status" => {
       let id = require_one(sub, "item")
       let status = @issues.Status::from_storage(require_one(sub, "status"))
-      set_status(db, id, status)
+      set_status(db, id, status, get_one(sub, "evidence"))
       println("#\{id} \{status.to_storage()}")
+    }
+    "events" => {
+      let id = get_one(sub, "item")
+      let limit : Int = @strconv.from_str(get_one(sub, "limit").unwrap_or("20"))
+      println(events_view(db, id, limit))
+    }
+    "search" => {
+      let query = get_many(sub, "query").join(" ")
+      println(search_view(db, query))
     }
     "export-json" => {
       let graph = load_graph(db)
@@ -127,7 +229,7 @@ fn cli_command() -> @argparse.Command {
   @argparse.Command(
     "issues",
     about="SQLite-backed DAG issue tracker for agents and humans.",
-    version="0.1.2",
+    version="0.1.3",
     subcommand_required=true,
     options=[
       @argparse.OptionArg(
@@ -145,6 +247,11 @@ fn cli_command() -> @argparse.Command {
         "add",
         about="Add an issue item and print its id.",
         options=[
+          @argparse.OptionArg(
+            "body",
+            long="body",
+            about="Initial mutable issue body/details.",
+          ),
           @argparse.OptionArg("status", long="status", default_values=["todo"]),
           @argparse.OptionArg("priority", long="priority", short='p', default_values=[
             "0",
@@ -184,17 +291,94 @@ fn cli_command() -> @argparse.Command {
       @argparse.Command(
         "todos",
         about="Print a Markdown task list under the focus item.",
+        flags=[
+          @argparse.FlagArg("ready", long="ready", conflicts_with=[
+            "blocked", "all",
+          ]),
+          @argparse.FlagArg("blocked", long="blocked", conflicts_with=[
+            "ready", "all",
+          ]),
+          @argparse.FlagArg("all", long="all", conflicts_with=[
+            "ready", "blocked",
+          ]),
+        ],
         positionals=[optional_item_arg],
+      ),
+      @argparse.Command(
+        "show",
+        about="Show one issue with details, relations, claim, notes, and events.",
+        positionals=[item_arg],
+      ),
+      @argparse.Command("body", about="Set mutable issue body/details.", positionals=[
+        item_arg,
+        @argparse.PositionArg(
+          "body",
+          num_args=@argparse.ValueRange(lower=1),
+          allow_hyphen_values=true,
+        ),
+      ]),
+      @argparse.Command("note", about="Append a note to an issue.", positionals=[
+        item_arg,
+        @argparse.PositionArg(
+          "note",
+          num_args=@argparse.ValueRange(lower=1),
+          allow_hyphen_values=true,
+        ),
+      ]),
+      @argparse.Command(
+        "claim",
+        about="Claim an issue for an agent, optionally with a lease.",
+        options=[
+          @argparse.OptionArg("agent", long="agent", required=true),
+          @argparse.OptionArg("ttl-minutes", long="ttl-minutes", default_values=[
+            "0",
+          ]),
+        ],
+        positionals=[item_arg],
+      ),
+      @argparse.Command(
+        "release",
+        about="Release an issue claim.",
+        options=[@argparse.OptionArg("agent", long="agent")],
+        positionals=[item_arg],
+      ),
+      @argparse.Command(
+        "done",
+        about="Mark an issue done with required evidence.",
+        positionals=[
+          item_arg,
+          @argparse.PositionArg(
+            "evidence",
+            num_args=@argparse.ValueRange(lower=1),
+            allow_hyphen_values=true,
+          ),
+        ],
       ),
       @argparse.Command(
         "status",
         about="Set item status: todo, in-progress, or done.",
+        options=[@argparse.OptionArg("evidence", long="evidence")],
         positionals=[
           item_arg,
           @argparse.PositionArg(
             "status",
             num_args=@argparse.ValueRange::single(),
           ),
+        ],
+      ),
+      @argparse.Command(
+        "events",
+        about="Print append-only event history.",
+        options=[
+          @argparse.OptionArg("limit", long="limit", default_values=["20"]),
+        ],
+        positionals=[optional_item_arg],
+      ),
+      @argparse.Command(
+        "search",
+        about="Search issue titles, bodies, notes, and event text.",
+        positionals=[
+          @argparse.PositionArg("query", num_args=@argparse.ValueRange(lower=1)),
         ],
       ),
       @argparse.Command("export-json", about="Export the full graph as JSON."),
@@ -238,6 +422,14 @@ fn get_many(matches : @argparse.Matches, name : String) -> Array[String] {
 }
 
 ///|
+fn get_flag(matches : @argparse.Matches, name : String) -> Bool {
+  match matches.flags.get(name) {
+    Some(value) => value
+    None => false
+  }
+}
+
+///|
 fn require_one(matches : @argparse.Matches, name : String) -> String {
   match get_one(matches, name) {
     Some(value) => value
@@ -258,15 +450,35 @@ async fn init_db(db : String) -> Unit {
     db, "SELECT sql FROM sqlite_master WHERE type='table' AND name='items' LIMIT 1;",
   )
   if current_schema.contains("INTEGER PRIMARY KEY") {
-    cli_fail(
-      "existing database uses numeric issue ids; create a new database or migrate it before using deterministic title hashes",
+    migrate_numeric_id_db(db)
+  }
+  ensure_schema(db)
+  if !table_has_column(db, "items", "body") {
+    ignore(
+      sqlite_exec(
+        db, "ALTER TABLE items ADD COLUMN body TEXT NOT NULL DEFAULT '';",
+      ),
     )
   }
+  let migrations =
+    #|INSERT OR IGNORE INTO schema_migrations(version) VALUES('001_deterministic_ids');
+    #|INSERT OR IGNORE INTO schema_migrations(version) VALUES('002_agent_workflow');
+    #|
+  ignore(sqlite_exec(db, migrations))
+}
+
+///|
+async fn ensure_schema(db : String) -> Unit {
   let schema =
     #|PRAGMA foreign_keys = ON;
+    #|CREATE TABLE IF NOT EXISTS schema_migrations (
+    #|  version TEXT PRIMARY KEY,
+    #|  applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    #|);
     #|CREATE TABLE IF NOT EXISTS items (
     #|  id TEXT PRIMARY KEY,
     #|  title TEXT NOT NULL,
+    #|  body TEXT NOT NULL DEFAULT '',
     #|  status TEXT NOT NULL DEFAULT 'todo',
     #|  priority INTEGER NOT NULL DEFAULT 0,
     #|  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -293,14 +505,171 @@ async fn init_db(db : String) -> Unit {
     #|  key TEXT PRIMARY KEY,
     #|  value TEXT NOT NULL
     #|);
+    #|CREATE TABLE IF NOT EXISTS item_notes (
+    #|  note_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #|  item_id TEXT NOT NULL,
+    #|  body TEXT NOT NULL,
+    #|  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    #|  FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
+    #|);
+    #|CREATE TABLE IF NOT EXISTS item_events (
+    #|  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #|  item_id TEXT NOT NULL,
+    #|  event_type TEXT NOT NULL,
+    #|  agent TEXT NOT NULL DEFAULT '',
+    #|  body TEXT NOT NULL DEFAULT '',
+    #|  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    #|  FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
+    #|);
+    #|CREATE TABLE IF NOT EXISTS item_claims (
+    #|  item_id TEXT PRIMARY KEY,
+    #|  agent TEXT NOT NULL,
+    #|  claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    #|  lease_until TEXT NOT NULL DEFAULT '',
+    #|  FOREIGN KEY(item_id) REFERENCES items(id) ON DELETE CASCADE
+    #|);
     #|
   ignore(sqlite_exec(db, schema))
+}
+
+///|
+async fn migrate_numeric_id_db(db : String) -> Unit {
+  if table_exists(db, "items_legacy_numeric") {
+    cli_fail(
+      "numeric id migration already has an items_legacy_numeric backup table",
+    )
+  }
+  let legacy_items : Array[LegacyItemRow] = @json.from_json(
+    sqlite_json(
+      db, "SELECT id, title, status, priority FROM items ORDER BY id;",
+    ),
+  )
+  let id_map : Map[String, String] = {}
+  let title_map : Map[String, String] = {}
+  for row in legacy_items {
+    let title = normalize_title(row.title)
+    let id = issue_id_from_title(title)
+    match title_map.get(id) {
+      Some(existing) =>
+        if existing != title {
+          cli_fail(
+            "numeric id migration found SHA conflict between '\{existing}' and '\{title}'; rename one title before migrating",
+          )
+        } else {
+          cli_fail(
+            "numeric id migration found duplicate title '\{title}'; rename one title before migrating",
+          )
+        }
+      None => {
+        title_map[id] = title
+        id_map[row.id.to_string()] = id
+      }
+    }
+  }
+  let legacy_edges : Array[LegacyEdgeRow] = if table_exists(db, "edges") {
+    @json.from_json(
+      sqlite_json(
+        db, "SELECT from_id, to_id, kind FROM edges ORDER BY from_id;",
+      ),
+    )
+  } else {
+    []
+  }
+  let state_rows : Array[StateRow] = if table_exists(db, "state") {
+    @json.from_json(
+      sqlite_json(
+        db, "SELECT value FROM state WHERE key='current_item_id' LIMIT 1;",
+      ),
+    )
+  } else {
+    []
+  }
+  let mut rename_sql = "PRAGMA foreign_keys = OFF; DROP TRIGGER IF EXISTS items_title_immutable; ALTER TABLE items RENAME TO items_legacy_numeric;"
+  if table_exists(db, "edges") {
+    rename_sql = rename_sql +
+      " ALTER TABLE edges RENAME TO edges_legacy_numeric;"
+  }
+  if table_exists(db, "state") {
+    rename_sql = rename_sql +
+      " ALTER TABLE state RENAME TO state_legacy_numeric;"
+  }
+  ignore(sqlite_exec(db, rename_sql))
+  ensure_schema(db)
+  for row in legacy_items {
+    let old_id = row.id.to_string()
+    guard id_map.get(old_id) is Some(new_id) else { continue }
+    let title = normalize_title(row.title)
+    ignore(
+      sqlite_exec(
+        db,
+        "INSERT INTO items(id, title, body, status, priority) VALUES(\{sql_quote(new_id)}, \{sql_quote(title)}, '', \{sql_quote(row.status)}, \{row.priority});",
+      ),
+    )
+    append_event(
+      db,
+      new_id,
+      "migrated",
+      "migrated from numeric id \{row.id}",
+      agent="",
+    )
+  }
+  for edge in legacy_edges {
+    let from_key = edge.from_id.to_string()
+    let to_key = edge.to_id.to_string()
+    guard id_map.get(from_key) is Some(from_id) else { continue }
+    guard id_map.get(to_key) is Some(to_id) else { continue }
+    ignore(
+      sqlite_exec(
+        db,
+        "INSERT OR IGNORE INTO edges(from_id, to_id, kind) VALUES(\{sql_quote(from_id)}, \{sql_quote(to_id)}, \{sql_quote(edge.kind)});",
+      ),
+    )
+  }
+  match state_rows {
+    [{ value }, ..] =>
+      match id_map.get(value) {
+        Some(new_id) =>
+          ignore(
+            sqlite_exec(
+              db,
+              "INSERT INTO state(key, value) VALUES('current_item_id', \{sql_quote(new_id)});",
+            ),
+          )
+        None => ()
+      }
+    [] => ()
+  }
+  let migrations =
+    #|INSERT OR IGNORE INTO schema_migrations(version) VALUES('000_numeric_id_migration');
+    #|INSERT OR IGNORE INTO schema_migrations(version) VALUES('001_deterministic_ids');
+    #|INSERT OR IGNORE INTO schema_migrations(version) VALUES('002_agent_workflow');
+    #|PRAGMA foreign_keys = ON;
+    #|
+  ignore(sqlite_exec(db, migrations))
+}
+
+///|
+async fn table_exists(db : String, table : String) -> Bool {
+  sqlite_scalar(
+    db,
+    "SELECT name FROM sqlite_master WHERE type='table' AND name=\{sql_quote(table)} LIMIT 1;",
+  ) !=
+  ""
+}
+
+///|
+async fn table_has_column(db : String, table : String, column : String) -> Bool {
+  let columns : Array[ColumnRow] = @json.from_json(
+    sqlite_json(db, "PRAGMA table_info(\{table});"),
+  )
+  columns.any(col => col.name == column)
 }
 
 ///|
 async fn add_item(
   db : String,
   title : String,
+  body : String,
   status : @issues.Status,
   priority : Int,
 ) -> String {
@@ -328,12 +697,20 @@ async fn add_item(
       }
     [] => {
       let quoted_title = sql_quote(normalized_title)
+      let quoted_body = sql_quote(body)
       let quoted_status = sql_quote(status.to_storage())
       ignore(
         sqlite_exec(
           db,
-          "INSERT INTO items(id, title, status, priority) VALUES(\{quoted_id}, \{quoted_title}, \{quoted_status}, \{priority});",
+          "INSERT INTO items(id, title, body, status, priority) VALUES(\{quoted_id}, \{quoted_title}, \{quoted_body}, \{quoted_status}, \{priority});",
         ),
+      )
+      append_event(
+        db,
+        id,
+        "created",
+        "created with status \{status.to_storage()} priority \{priority}",
+        agent="",
       )
       id
     }
@@ -360,6 +737,8 @@ async fn add_edge(
   kind : @issues.EdgeKind,
 ) -> Unit {
   init_db(db)
+  ignore(require_item(db, from_id))
+  ignore(require_item(db, to_id))
   let quoted_from = sql_quote(from_id)
   let quoted_to = sql_quote(to_id)
   let quoted_kind = sql_quote(kind.to_storage())
@@ -368,6 +747,20 @@ async fn add_edge(
       db,
       "INSERT OR IGNORE INTO edges(from_id, to_id, kind) VALUES(\{quoted_from}, \{quoted_to}, \{quoted_kind});",
     ),
+  )
+  append_event(
+    db,
+    from_id,
+    "linked",
+    "\{kind.to_storage()} -> #\{to_id}",
+    agent="",
+  )
+  append_event(
+    db,
+    to_id,
+    "linked",
+    "#\{from_id} -> \{kind.to_storage()}",
+    agent="",
   )
 }
 
@@ -384,14 +777,211 @@ async fn set_focus(db : String, id : String) -> Unit {
 }
 
 ///|
-async fn set_status(db : String, id : String, status : @issues.Status) -> Unit {
+async fn set_body(db : String, id : String, body : String) -> Unit {
   init_db(db)
+  ignore(require_item(db, id))
+  ignore(
+    sqlite_exec(
+      db,
+      "UPDATE items SET body=\{sql_quote(body)}, updated_at=CURRENT_TIMESTAMP WHERE id=\{sql_quote(id)};",
+    ),
+  )
+  append_event(db, id, "body_updated", body, agent="")
+}
+
+///|
+async fn add_note(db : String, id : String, body : String) -> Unit {
+  init_db(db)
+  ignore(require_item(db, id))
+  let note = body.trim().to_owned()
+  if note == "" {
+    cli_fail("note must not be empty")
+  }
+  ignore(
+    sqlite_exec(
+      db,
+      "INSERT INTO item_notes(item_id, body) VALUES(\{sql_quote(id)}, \{sql_quote(note)});",
+    ),
+  )
+  append_event(db, id, "note_added", note, agent="")
+}
+
+///|
+async fn set_status(
+  db : String,
+  id : String,
+  status : @issues.Status,
+  evidence : String?,
+) -> Unit {
+  init_db(db)
+  let item = require_item(db, id)
+  let evidence_text = evidence.unwrap_or("").trim().to_owned()
+  if status == Done && evidence_text == "" {
+    cli_fail(
+      "done status requires evidence; use `done <item> <evidence>` or `status --evidence <text> <item> done`",
+    )
+  }
   let quoted_id = sql_quote(id)
   let quoted_status = sql_quote(status.to_storage())
   ignore(
     sqlite_exec(
       db,
       "UPDATE items SET status=\{quoted_status}, updated_at=CURRENT_TIMESTAMP WHERE id=\{quoted_id};",
+    ),
+  )
+  let body = if evidence_text == "" {
+    "\{item.status} -> \{status.to_storage()}"
+  } else {
+    "\{item.status} -> \{status.to_storage()}: \{evidence_text}"
+  }
+  append_event(db, id, "status_changed", body, agent="")
+  if status == Done {
+    let done_note = sql_quote("Done evidence: " + evidence_text)
+    ignore(
+      sqlite_exec(
+        db,
+        "INSERT INTO item_notes(item_id, body) VALUES(\{quoted_id}, \{done_note});",
+      ),
+    )
+  }
+}
+
+///|
+async fn require_item(db : String, id : String) -> ItemRow {
+  let rows : Array[ItemRow] = @json.from_json(
+    sqlite_json(
+      db,
+      "SELECT id, title, body, status, priority FROM items WHERE id=\{sql_quote(id)} LIMIT 1;",
+    ),
+  )
+  match rows {
+    [row, ..] => row
+    [] => cli_fail("unknown issue id: \{id}")
+  }
+}
+
+///|
+async fn append_event(
+  db : String,
+  item_id : String,
+  event_type : String,
+  body : String,
+  agent~ : String,
+) -> Unit {
+  ignore(
+    sqlite_exec(
+      db,
+      "INSERT INTO item_events(item_id, event_type, agent, body) VALUES(\{sql_quote(item_id)}, \{sql_quote(event_type)}, \{sql_quote(agent)}, \{sql_quote(body)});",
+    ),
+  )
+}
+
+///|
+async fn claim_item(
+  db : String,
+  id : String,
+  agent : String,
+  ttl_minutes : Int,
+) -> Unit {
+  init_db(db)
+  ignore(require_item(db, id))
+  let owner = agent.trim().to_owned()
+  if owner == "" {
+    cli_fail("claim agent must not be empty")
+  }
+  if ttl_minutes < 0 {
+    cli_fail("ttl-minutes must be non-negative")
+  }
+  match active_claim(db, id) {
+    Some(claim) =>
+      if claim.agent != owner {
+        let until = if claim.lease_until == "" {
+          "without expiry"
+        } else {
+          "until \{claim.lease_until}"
+        }
+        cli_fail("ISSUE_CLAIMED: #\{id} is claimed by \{claim.agent} \{until}")
+      }
+    None => ()
+  }
+  let lease_sql = if ttl_minutes == 0 {
+    "''"
+  } else {
+    "datetime('now', '+\{ttl_minutes} minutes')"
+  }
+  ignore(
+    sqlite_exec(
+      db,
+      "INSERT INTO item_claims(item_id, agent, claimed_at, lease_until) VALUES(\{sql_quote(id)}, \{sql_quote(owner)}, CURRENT_TIMESTAMP, \{lease_sql}) ON CONFLICT(item_id) DO UPDATE SET agent=excluded.agent, claimed_at=excluded.claimed_at, lease_until=excluded.lease_until;",
+    ),
+  )
+  append_event(
+    db,
+    id,
+    "claimed",
+    if ttl_minutes == 0 {
+      "claimed without expiry"
+    } else {
+      "claimed for \{ttl_minutes} minutes"
+    },
+    agent=owner,
+  )
+}
+
+///|
+async fn release_item(db : String, id : String, agent : String) -> Unit {
+  init_db(db)
+  ignore(require_item(db, id))
+  let owner = agent.trim().to_owned()
+  match active_claim(db, id) {
+    Some(claim) =>
+      if owner != "" && claim.agent != owner {
+        cli_fail(
+          "ISSUE_CLAIMED: #\{id} is claimed by \{claim.agent}, not \{owner}",
+        )
+      }
+    None => ()
+  }
+  ignore(
+    sqlite_exec(db, "DELETE FROM item_claims WHERE item_id=\{sql_quote(id)};"),
+  )
+  append_event(db, id, "released", "claim released", agent=owner)
+}
+
+///|
+async fn active_claim(db : String, id : String) -> ClaimRow? {
+  let rows : Array[ClaimRow] = @json.from_json(
+    sqlite_json(
+      db,
+      "SELECT item_id, agent, claimed_at, lease_until FROM item_claims WHERE item_id=\{sql_quote(id)} AND (lease_until='' OR lease_until > CURRENT_TIMESTAMP) LIMIT 1;",
+    ),
+  )
+  match rows {
+    [row, ..] => Some(row)
+    [] => None
+  }
+}
+
+///|
+async fn load_notes(db : String, id : String, limit : Int) -> Array[NoteRow] {
+  @json.from_json(
+    sqlite_json(
+      db,
+      "SELECT note_id, body, created_at FROM item_notes WHERE item_id=\{sql_quote(id)} ORDER BY note_id DESC LIMIT \{limit};",
+    ),
+  )
+}
+
+///|
+async fn load_events(db : String, id : String?, limit : Int) -> Array[EventRow] {
+  let where_clause = match id {
+    Some(value) => "WHERE item_id=\{sql_quote(value)}"
+    None => ""
+  }
+  @json.from_json(
+    sqlite_json(
+      db,
+      "SELECT event_id, item_id, event_type, agent, body, created_at FROM item_events \{where_clause} ORDER BY event_id DESC LIMIT \{limit};",
     ),
   )
 }
@@ -401,7 +991,7 @@ async fn load_graph(db : String) -> @issues.IssueGraph {
   init_db(db)
   let item_rows : Array[ItemRow] = @json.from_json(
     sqlite_json(
-      db, "SELECT id, title, status, priority FROM items ORDER BY id;",
+      db, "SELECT id, title, body, status, priority FROM items ORDER BY id;",
     ),
   )
   let edge_rows : Array[EdgeRow] = @json.from_json(
@@ -418,6 +1008,7 @@ async fn load_graph(db : String) -> @issues.IssueGraph {
     items: item_rows.map(row => {
       id: row.id,
       title: row.title,
+      body: row.body,
       status: @issues.Status::from_storage(row.status),
       priority: row.priority,
     }),
@@ -430,6 +1021,189 @@ async fn load_graph(db : String) -> @issues.IssueGraph {
       [{ value }, ..] => Some(value)
       [] => None
     },
+  }
+}
+
+///|
+async fn show_item(db : String, id : String) -> String {
+  init_db(db)
+  let graph = load_graph(db)
+  let row = require_item(db, id)
+  let item : @issues.IssueItem = {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    status: @issues.Status::from_storage(row.status),
+    priority: row.priority,
+  }
+  let buf = StringBuilder()
+  buf.write_string("#\{item.id} \{item.title}\n")
+  buf.write_string("Status: \{item.status.to_storage()}\n")
+  buf.write_string("Priority: \{item.priority}\n")
+  match active_claim(db, id) {
+    Some(claim) =>
+      if claim.lease_until == "" {
+        buf.write_string(
+          "Claim: \{claim.agent} on #\{claim.item_id} since \{claim.claimed_at} (no expiry)\n",
+        )
+      } else {
+        buf.write_string(
+          "Claim: \{claim.agent} on #\{claim.item_id} since \{claim.claimed_at} until \{claim.lease_until}\n",
+        )
+      }
+    None => buf.write_string("Claim: none\n")
+  }
+  if item.body.trim().to_owned() != "" {
+    buf.write_string("\nBody:\n")
+    write_indented(buf, item.body)
+  }
+  write_relation_section(
+    buf,
+    "Parents",
+    relation_items(graph, id, parent=true, Contains),
+  )
+  write_relation_section(buf, "Subtasks", graph.contains_children(id))
+  write_relation_section(buf, "Dependencies", graph.dependencies(id))
+  let blockers = graph.dependencies(id).filter(dep => dep.status.is_open())
+  write_relation_section(buf, "Open blockers", blockers)
+  let notes = load_notes(db, id, 10)
+  buf.write_string("\nNotes:\n")
+  if notes.length() == 0 {
+    buf.write_string("- none\n")
+  } else {
+    for note in notes {
+      buf.write_string(
+        "- \{note.created_at} #\{note.note_id}: \{one_line(note.body)}\n",
+      )
+    }
+  }
+  buf.write_string("\nRecent events:\n")
+  let events = load_events(db, Some(id), 10)
+  if events.length() == 0 {
+    buf.write_string("- none\n")
+  } else {
+    for event in events {
+      let agent = if event.agent == "" { "" } else { " by \{event.agent}" }
+      let body = if event.body == "" { "" } else { ": \{one_line(event.body)}" }
+      buf.write_string(
+        "- @\{event.event_id} \{event.created_at} \{event.event_type}\{agent}\{body}\n",
+      )
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn write_relation_section(
+  buf : StringBuilder,
+  title : String,
+  items : Array[@issues.IssueItem],
+) -> Unit {
+  buf.write_string("\n\{title}:\n")
+  if items.length() == 0 {
+    buf.write_string("- none\n")
+  } else {
+    for item in items {
+      buf.write_string(
+        "- [\{item.status.to_storage()}] #\{item.id} \{item.title} (p\{item.priority})\n",
+      )
+    }
+  }
+}
+
+///|
+fn relation_items(
+  graph : @issues.IssueGraph,
+  id : String,
+  parent~ : Bool,
+  kind : @issues.EdgeKind,
+) -> Array[@issues.IssueItem] {
+  let items : Array[@issues.IssueItem] = []
+  for edge in graph.edges {
+    if edge.kind == kind {
+      let candidate = if parent && edge.to_id == id {
+        graph.find_item(edge.from_id)
+      } else if !parent && edge.from_id == id {
+        graph.find_item(edge.to_id)
+      } else {
+        None
+      }
+      match candidate {
+        Some(item) => items.push(item)
+        None => ()
+      }
+    }
+  }
+  items
+}
+
+///|
+fn write_indented(buf : StringBuilder, value : String) -> Unit {
+  for line in value.split("\n") {
+    buf.write_string("  \{line}\n")
+  }
+}
+
+///|
+fn one_line(value : String) -> String {
+  value.replace_all(old="\n", new=" ").trim().to_owned()
+}
+
+///|
+async fn events_view(db : String, id : String?, limit : Int) -> String {
+  init_db(db)
+  match id {
+    Some(value) => ignore(require_item(db, value))
+    None => ()
+  }
+  let rows = load_events(db, id, limit)
+  if rows.length() == 0 {
+    "no events\n"
+  } else {
+    let buf = StringBuilder()
+    for event in rows {
+      let agent = if event.agent == "" { "" } else { " by \{event.agent}" }
+      let body = if event.body == "" { "" } else { ": \{one_line(event.body)}" }
+      buf.write_string(
+        "@\{event.event_id} \{event.created_at} #\{event.item_id} \{event.event_type}\{agent}\{body}\n",
+      )
+    }
+    buf.to_string()
+  }
+}
+
+///|
+async fn search_view(db : String, query : String) -> String {
+  init_db(db)
+  let needle = query.trim().to_owned()
+  if needle == "" {
+    cli_fail("search query must not be empty")
+  }
+  let pattern = sql_quote("%" + needle.to_lower() + "%")
+  let search_template =
+    #|SELECT DISTINCT items.id, items.title, items.body, items.status, items.priority
+    #|FROM items
+    #|LEFT JOIN item_notes ON item_notes.item_id = items.id
+    #|LEFT JOIN item_events ON item_events.item_id = items.id
+    #|WHERE lower(items.id) LIKE \#(pattern)
+    #|   OR lower(items.title) LIKE \#(pattern)
+    #|   OR lower(items.body) LIKE \#(pattern)
+    #|   OR lower(item_notes.body) LIKE \#(pattern)
+    #|   OR lower(item_events.body) LIKE \#(pattern)
+    #|ORDER BY items.status, items.priority DESC, items.id;
+    #|
+  let search_sql = search_template.replace_all(old="\\#(pattern)", new=pattern)
+  let rows : Array[ItemRow] = @json.from_json(sqlite_json(db, search_sql))
+  if rows.length() == 0 {
+    "no matches\n"
+  } else {
+    let buf = StringBuilder()
+    for row in rows {
+      buf.write_string(
+        "#\{row.id} \{row.title} [\{row.status} p\{row.priority}]\n",
+      )
+    }
+    buf.to_string()
   }
 }
 

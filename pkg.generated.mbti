@@ -30,7 +30,10 @@ pub(all) struct IssueGraph {
   edges : Array[IssueEdge]
   current_id : String?
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn IssueGraph::all_todos_markdown(Self, String?) -> String
 pub fn IssueGraph::blocked_count(Self) -> Int
+pub fn IssueGraph::blocked_todos(Self, String?) -> Array[IssueItem]
+pub fn IssueGraph::blocked_todos_markdown(Self, String?) -> String
 pub fn IssueGraph::contains_children(Self, String) -> Array[IssueItem]
 pub fn IssueGraph::dependencies(Self, String) -> Array[IssueItem]
 pub fn IssueGraph::edge_count(Self, EdgeKind) -> Int
@@ -41,11 +44,15 @@ pub fn IssueGraph::is_blocked(Self, String) -> Bool
 pub fn IssueGraph::next_todo(Self, String?) -> IssueItem?
 pub fn IssueGraph::open_count(Self) -> Int
 pub fn IssueGraph::outline(Self, String?) -> String
+pub fn IssueGraph::ready_todos(Self, String?) -> Array[IssueItem]
+pub fn IssueGraph::ready_todos_markdown(Self, String?) -> String
+pub fn IssueGraph::scoped_items(Self, String?) -> Array[IssueItem]
 pub fn IssueGraph::todos_markdown(Self, String?) -> String
 
 pub(all) struct IssueItem {
   id : String
   title : String
+  body : String
   status : Status
   priority : Int
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)

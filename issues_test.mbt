@@ -2,11 +2,23 @@
 fn sample_graph() -> @issues.IssueGraph {
   {
     items: [
-      { id: "1", title: "Build tracker", status: Todo, priority: 5 },
-      { id: "2", title: "Design schema", status: Done, priority: 3 },
-      { id: "3", title: "Implement CLI", status: Todo, priority: 8 },
-      { id: "4", title: "Implement dashboard", status: Todo, priority: 6 },
-      { id: "5", title: "Pick visual layout", status: Todo, priority: 4 },
+      { id: "1", title: "Build tracker", body: "", status: Todo, priority: 5 },
+      { id: "2", title: "Design schema", body: "", status: Done, priority: 3 },
+      { id: "3", title: "Implement CLI", body: "", status: Todo, priority: 8 },
+      {
+        id: "4",
+        title: "Implement dashboard",
+        body: "",
+        status: Todo,
+        priority: 6,
+      },
+      {
+        id: "5",
+        title: "Pick visual layout",
+        body: "",
+        status: Todo,
+        priority: 4,
+      },
     ],
     edges: [
       { from_id: "1", to_id: "2", kind: Contains },
@@ -42,6 +54,21 @@ test "blocked parent does not hide actionable child leaf" {
       None => "none"
     },
     content="5",
+  )
+}
+
+///|
+test "todo views filter ready blocked and all scoped items" {
+  let graph = sample_graph()
+  inspect(graph.ready_todos(None).map(item => item.id).join(","), content="3,5")
+  inspect(graph.blocked_todos(None).map(item => item.id).join(","), content="4")
+  inspect(
+    graph.all_todos_markdown(Some("4")),
+    content=(
+      #|- [ ] #4 Implement dashboard (p6 blocked)
+      #|- [ ] #5 Pick visual layout (p4)
+      #|
+    ),
   )
 }
 

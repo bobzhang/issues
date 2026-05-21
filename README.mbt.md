@@ -9,12 +9,14 @@ Run the CLI through Moon while developing:
 
 ```bash
 moon run --target native cmd/main -- --db issues.db init
-moon run --target native cmd/main -- --db issues.db add -p 5 Build tracker
+moon run --target native cmd/main -- --db issues.db add -p 5 --body "Track the project plan." Build tracker
 moon run --target native cmd/main -- --db issues.db add Implement CLI
 moon run --target native cmd/main -- --db issues.db link -t contains iss_21845b479070a3c5 iss_0e62aff88401672c
 moon run --target native cmd/main -- --db issues.db focus iss_21845b479070a3c5
 moon run --target native cmd/main -- --db issues.db next
 moon run --target native cmd/main -- --db issues.db todos
+moon run --target native cmd/main -- --db issues.db todos --ready
+moon run --target native cmd/main -- --db issues.db show iss_21845b479070a3c5
 moon run --target native cmd/main -- --db issues.db outline
 moon run --target native cmd/main -- --db issues.db serve
 ```
@@ -34,7 +36,25 @@ Edges are typed:
 
 `next` returns the highest-priority unfinished, unblocked leaf under the current
 focus item. `todos` renders the current focus as a recursive Markdown task list
-for terminal reading.
+for terminal reading. Use `todos --ready`, `todos --blocked`, or `todos --all`
+for flat filtered lists.
+
+Larger-agent workflows have mutable details, notes, claims, done evidence, search,
+and an append-only event log:
+
+```bash
+moon run --target native cmd/main -- --db issues.db body iss_21845b479070a3c5 "Mutable details and acceptance criteria."
+moon run --target native cmd/main -- --db issues.db note iss_21845b479070a3c5 "Found the schema edge case."
+moon run --target native cmd/main -- --db issues.db claim --agent codex --ttl-minutes 60 iss_21845b479070a3c5
+moon run --target native cmd/main -- --db issues.db done iss_0e62aff88401672c "Validated with moon test --target native."
+moon run --target native cmd/main -- --db issues.db events iss_21845b479070a3c5
+moon run --target native cmd/main -- --db issues.db search schema
+moon run --target native cmd/main -- --db issues.db release --agent codex iss_21845b479070a3c5
+```
+
+The SQLite schema records migrations in `schema_migrations`. Current hashed-ID
+databases migrate additively, and old numeric-ID databases are migrated into
+deterministic title-hash IDs with `items_legacy_numeric` backup tables.
 
 ## Dashboard
 
