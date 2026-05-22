@@ -90,6 +90,13 @@ struct StatusPayload {
 } derive(FromJson)
 
 ///|
+struct MarkdownTodo {
+  title : String
+  status : @issues.Status
+  children : Array[MarkdownTodo]
+} derive(Debug)
+
+///|
 async fn main {
   let command = cli_command()
   let matches = command.parse(env=@env.get_env_vars())
@@ -216,6 +223,14 @@ async fn main {
       let query = get_many(sub, "query").join(" ")
       println(search_view(db, query))
     }
+    "import-markdown" => {
+      let path = require_one(sub, "file")
+      let parent_id = get_one(sub, "parent")
+      let source = @fs.read_file(path).text()
+      let todos = markdown_todos_from_string(source)
+      let report = import_markdown_todos(db, parent_id, todos)
+      println(report)
+    }
     "export-json" => {
       let graph = load_graph(db)
       println(graph.to_json().stringify(indent=2))
@@ -248,7 +263,7 @@ fn cli_command() -> @argparse.Command {
   @argparse.Command(
     "issues",
     about="SQLite-backed DAG issue tracker for agents and humans.",
-    version="0.1.4",
+    version="0.1.5",
     subcommand_required=true,
     options=[
       @argparse.OptionArg(
@@ -398,6 +413,14 @@ fn cli_command() -> @argparse.Command {
         about="Search issue titles, bodies, notes, and event text.",
         positionals=[
           @argparse.PositionArg("query", num_args=@argparse.ValueRange(lower=1)),
+        ],
+      ),
+      @argparse.Command(
+        "import-markdown",
+        about="Create issue todos from a Markdown task list.",
+        options=[@argparse.OptionArg("parent", long="parent")],
+        positionals=[
+          @argparse.PositionArg("file", num_args=@argparse.ValueRange::single()),
         ],
       ),
       @argparse.Command("export-json", about="Export the full graph as JSON."),
@@ -746,6 +769,146 @@ fn issue_id_from_title(title : String) -> String {
   let digest = @crypto.sha256(@utf8.encode(title))
   let hex = @crypto.bytes_to_hex_string(digest)
   "iss_" + hex.view(end_offset=16).to_owned()
+}
+
+///|
+fn markdown_todos_from_string(source : String) -> Array[MarkdownTodo] {
+  let doc = @cmark.Doc::from_string(strict=false, source)
+  markdown_todos_from_block(doc.block)
+}
+
+///|
+fn markdown_todos_from_block(block : @cmark.Block) -> Array[MarkdownTodo] {
+  let todos : Array[MarkdownTodo] = []
+  match block {
+    @cmark.Block::Blocks(node) =>
+      for child in node.v.to_array() {
+        for todo in markdown_todos_from_block(child) {
+          todos.push(todo)
+        }
+      }
+    @cmark.Block::BlockQuote(node) =>
+      for todo in markdown_todos_from_block(node.v.block) {
+        todos.push(todo)
+      }
+    @cmark.Block::List(node) =>
+      for item in node.v.items.to_array() {
+        for todo in markdown_todos_from_list_item(item.v) {
+          todos.push(todo)
+        }
+      }
+    _ => ()
+  }
+  todos
+}
+
+///|
+fn markdown_todos_from_list_item(item : @cmark.ListItem) -> Array[MarkdownTodo] {
+  let (title, children) = markdown_item_content(item.block)
+  match item.ext_task_marker {
+    Some(marker) => {
+      let title = title.trim().to_owned()
+      if title == "" {
+        cli_fail("markdown task item title must not be empty")
+      }
+      [{ title, status: markdown_task_status(marker.v), children }]
+    }
+    None => children
+  }
+}
+
+///|
+fn markdown_item_content(block : @cmark.Block) -> (String, Array[MarkdownTodo]) {
+  let mut title = ""
+  let children : Array[MarkdownTodo] = []
+  match block {
+    @cmark.Block::Paragraph(node) => title = inline_plain_text(node.v.inline)
+    @cmark.Block::Heading(node) => title = inline_plain_text(node.v.inline)
+    @cmark.Block::Blocks(node) =>
+      for child in node.v.to_array() {
+        if title == "" {
+          match child {
+            @cmark.Block::Paragraph(node) =>
+              title = inline_plain_text(node.v.inline)
+            @cmark.Block::Heading(node) =>
+              title = inline_plain_text(node.v.inline)
+            _ => ()
+          }
+        }
+        for todo in markdown_todos_from_block(child) {
+          children.push(todo)
+        }
+      }
+    _ =>
+      for todo in markdown_todos_from_block(block) {
+        children.push(todo)
+      }
+  }
+  (title, children)
+}
+
+///|
+fn inline_plain_text(inline : @cmark.Inline) -> String {
+  let chunks : Array[String] = []
+  for line in inline.to_plain_text(break_on_soft=false).to_array() {
+    chunks.push(line.to_array().join(""))
+  }
+  chunks.join(" ").trim().to_owned()
+}
+
+///|
+fn markdown_task_status(marker : Char) -> @issues.Status {
+  match @cmark.ListTaskStatus::from_marker(marker) {
+    @cmark.ListTaskStatus::Unchecked => Todo
+    _ => Done
+  }
+}
+
+///|
+async fn import_markdown_todos(
+  db : String,
+  parent_id : String?,
+  todos : Array[MarkdownTodo],
+) -> String {
+  init_db(db)
+  if todos.length() == 0 {
+    cli_fail("no markdown task list items found")
+  }
+  if parent_id is Some(id) {
+    ignore(require_item(db, id))
+  }
+  let body = StringBuilder::new()
+  let mut count = 0
+  for todo in todos {
+    count += import_markdown_todo(db, parent_id, todo, 0, body)
+  }
+  let report = StringBuilder::new()
+  report.write_string("imported \{count} todos\n")
+  report.write_string(body.to_string())
+  report.to_string()
+}
+
+///|
+async fn import_markdown_todo(
+  db : String,
+  parent_id : String?,
+  todo : MarkdownTodo,
+  depth : Int,
+  report : StringBuilder,
+) -> Int {
+  let id = add_item(db, todo.title, "", todo.status, 0)
+  if parent_id is Some(parent) {
+    add_edge(db, parent, id, Contains)
+  }
+  for _ in 0..<depth {
+    report.write_string("  ")
+  }
+  report.write_string("- #\{id} \{todo.title} [\{todo.status.to_storage()}]\n")
+  let mut count = 1
+  for child in todo.children {
+    count += import_markdown_todo(db, Some(id), child, depth + 1, report)
+  }
+  count
 }
 
 ///|

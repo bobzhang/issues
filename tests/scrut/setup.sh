@@ -8,7 +8,11 @@ export ISSUES_DB="$TMPDIR/issues.db"
 
 moon -C "$REPO_ROOT" build --target native cmd/main >/dev/null
 
-export ISSUES_BIN="$REPO_ROOT/_build/native/debug/build/cmd/main/main.exe"
+if [ -x "$REPO_ROOT/_build/native/debug/build/bobzhang/issues/cmd/main/main.exe" ]; then
+  export ISSUES_BIN="$REPO_ROOT/_build/native/debug/build/bobzhang/issues/cmd/main/main.exe"
+else
+  export ISSUES_BIN="$REPO_ROOT/_build/native/debug/build/cmd/main/main.exe"
+fi
 
 issues() {
   "$ISSUES_BIN" --db "$ISSUES_DB" "$@"

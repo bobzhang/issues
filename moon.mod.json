@@ -1,10 +1,11 @@
 {
   "name": "bobzhang/issues",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "deps": {
     "moonbit-community/rabbita": "0.12.2",
     "moonbitlang/async": "0.18.1",
-    "moonbitlang/x": "0.4.41"
+    "moonbitlang/x": "0.4.41",
+    "moonbit-community/cmark": "0.4.3"
   },
   "readme": "README.mbt.md",
   "repository": "https://github.com/bobzhang/issues",

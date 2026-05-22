@@ -18,6 +18,7 @@ moon run --target native cmd/main -- --db issues.db todos
 moon run --target native cmd/main -- --db issues.db todos --ready
 moon run --target native cmd/main -- --db issues.db show iss_21845b479070a3c5
 moon run --target native cmd/main -- --db issues.db outline
+moon run --target native cmd/main -- --db issues.db import-markdown plan.md
 moon run --target native cmd/main -- --db issues.db serve
 ```
 
@@ -38,6 +39,19 @@ Edges are typed:
 focus item. `todos` renders the current focus as a recursive Markdown task list
 for terminal reading. Use `todos --ready`, `todos --blocked`, or `todos --all`
 for flat filtered lists.
+
+`import-markdown` batch-creates todos from a CommonMark task list using
+`cmark.mbt`:
+
+```markdown
+- [ ] Build tracker
+      - [x] Implement CLI
+      - [ ] Implement dashboard
+```
+
+Nested task bullets should be indented to the parent item content column; after
+`- [ ] Parent`, that means six spaces before the child `-`. Use
+`--parent <issue-id>` to attach imported top-level tasks under an existing issue.
 
 Larger-agent workflows have mutable details, notes, claims, done evidence, search,
 and an append-only event log:

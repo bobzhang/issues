@@ -1,5 +1,6 @@
 import {
   "bobzhang/issues",
+  "moonbit-community/cmark/cmark",
   "moonbitlang/core/argparse",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",

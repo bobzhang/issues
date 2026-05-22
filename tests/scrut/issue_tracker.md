@@ -147,6 +147,25 @@ $ issues outline | sed '/^$/d'
   - [todo] #iss_8ec5a2d8168fe4c2 Prepare docs (p3)
 ```
 
+## Import Todos From Markdown
+
+Markdown task lists can be imported in batch. The parser uses CommonMark task
+list rules; nested task bullets are indented to the parent item's content
+column.
+
+```scrut
+$ cat > "$TMPDIR"/markdown-plan.md <<'EOF'
+> - [ ] Batch root
+>       - [x] Batch child done
+>       - [ ] Batch child open
+> EOF
+> issues import-markdown "$TMPDIR"/markdown-plan.md | sed '/^$/d'
+imported 3 todos
+- #iss_* Batch root [todo] (glob)
+  - #iss_* Batch child done [done] (glob)
+  - #iss_* Batch child open [todo] (glob)
+```
+
 ## Mutate Details Without Renaming
 
 The title is stable, but the body, notes, and status are intentionally mutable.
