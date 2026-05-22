@@ -97,3 +97,15 @@ moon test --target js
 moon check --target native
 moon check --target js
 ```
+
+## Executable CLI Docs
+
+The `tests/scrut/issue_tracker.md` document is a Scrut suite: it describes the
+agent workflow in Markdown and executes each `scrut` block against the compiled
+CLI with a fresh SQLite database.
+
+Install Scrut, then run:
+
+```bash
+scripts/test-scrut.sh
+```
