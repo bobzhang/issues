@@ -668,7 +668,7 @@ async fn migrate_numeric_id_db(db : String) -> Unit {
     )
   }
   match state_rows {
-    [{ value }, ..] =>
+    [{ value, }, ..] =>
       match id_map.get(value) {
         Some(new_id) =>
           ignore(
@@ -811,7 +811,7 @@ fn markdown_todos_from_list_item(item : @cmark.ListItem) -> Array[MarkdownTodo] 
       if title == "" {
         cli_fail("markdown task item title must not be empty")
       }
-      [{ title, status: markdown_task_status(marker.v), children }]
+      [{ title, status: markdown_task_status(marker.v), children, }]
     }
     None => children
   }
@@ -1200,7 +1200,7 @@ async fn load_graph(db : String) -> @issues.IssueGraph {
       kind: @issues.EdgeKind::from_storage(row.kind),
     }),
     current_id: match state_rows {
-      [{ value }, ..] => Some(value)
+      [{ value, }, ..] => Some(value)
       [] => None
     },
   }

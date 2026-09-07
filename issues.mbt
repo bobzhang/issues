@@ -6,6 +6,18 @@ pub(all) enum Status {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+pub extend Status with Eq::{not_equal, equal}
+
+///|
+pub extend Status with Debug::{to_repr}
+
+///|
+pub extend Status with ToJson::{to_json}
+
+///|
+pub extend Status with @json.FromJson::{from_json}
+
+///|
 pub fn Status::from_storage(value : String) -> Status raise {
   match value {
     "todo" | "Todo" => Todo
@@ -46,6 +58,18 @@ pub(all) enum EdgeKind {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+pub extend EdgeKind with Eq::{not_equal, equal}
+
+///|
+pub extend EdgeKind with Debug::{to_repr}
+
+///|
+pub extend EdgeKind with ToJson::{to_json}
+
+///|
+pub extend EdgeKind with @json.FromJson::{from_json}
+
+///|
 pub fn EdgeKind::from_storage(value : String) -> EdgeKind raise {
   match value {
     "contains" | "Contains" => Contains
@@ -74,11 +98,35 @@ pub(all) struct IssueItem {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+pub extend IssueItem with Eq::{not_equal, equal}
+
+///|
+pub extend IssueItem with Debug::{to_repr}
+
+///|
+pub extend IssueItem with ToJson::{to_json}
+
+///|
+pub extend IssueItem with @json.FromJson::{from_json}
+
+///|
 pub(all) struct IssueEdge {
   from_id : String
   to_id : String
   kind : EdgeKind
 } derive(Eq, Debug, ToJson, FromJson)
+
+///|
+pub extend IssueEdge with Eq::{not_equal, equal}
+
+///|
+pub extend IssueEdge with Debug::{to_repr}
+
+///|
+pub extend IssueEdge with ToJson::{to_json}
+
+///|
+pub extend IssueEdge with @json.FromJson::{from_json}
 
 ///|
 pub(all) struct IssueGraph {
@@ -88,8 +136,20 @@ pub(all) struct IssueGraph {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+pub extend IssueGraph with Eq::{not_equal, equal}
+
+///|
+pub extend IssueGraph with Debug::{to_repr}
+
+///|
+pub extend IssueGraph with ToJson::{to_json}
+
+///|
+pub extend IssueGraph with @json.FromJson::{from_json}
+
+///|
 pub fn IssueGraph::empty() -> IssueGraph {
-  { items: [], edges: [], current_id: None }
+  { items: [], edges: [], current_id: None, }
 }
 
 ///|
@@ -215,7 +275,7 @@ pub fn IssueGraph::blocked_todos(
 pub fn IssueGraph::outline(self : IssueGraph, focus : String?) -> String {
   let roots = self.outline_roots(focus)
   let buf = StringBuilder()
-  let seen : Map[String, Unit] = {}
+  let seen : Map[String, Unit] = Map([])
   for root in roots {
     write_outline_node(self, root.id, 0, buf, seen)
   }
@@ -226,7 +286,7 @@ pub fn IssueGraph::outline(self : IssueGraph, focus : String?) -> String {
 pub fn IssueGraph::todos_markdown(self : IssueGraph, focus : String?) -> String {
   let roots = self.outline_roots(focus)
   let buf = StringBuilder()
-  let seen : Map[String, Unit] = {}
+  let seen : Map[String, Unit] = Map([])
   for root in roots {
     write_todo_markdown_node(self, root.id, 0, buf, seen)
   }
@@ -295,7 +355,7 @@ fn IssueGraph::scoped_item_ids(
   self : IssueGraph,
   focus : String?,
 ) -> Map[String, Unit] {
-  let seen : Map[String, Unit] = {}
+  let seen : Map[String, Unit] = Map([])
   match resolve_focus(focus, self.current_id) {
     Some(root) => collect_contains_scope(self, root, seen)
     None =>
@@ -318,7 +378,7 @@ fn IssueGraph::outline_roots(
         None => []
       }
     None => {
-      let has_parent : Map[String, Unit] = {}
+      let has_parent : Map[String, Unit] = Map([])
       for edge in self.edges {
         if edge.kind == Contains {
           has_parent[edge.to_id] = ()
