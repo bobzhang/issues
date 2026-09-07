@@ -33,6 +33,9 @@ pub(all) struct Model {
 } derive(Debug)
 
 ///|
+pub extend Model with Debug::{to_repr}
+
+///|
 pub(all) enum Msg {
   Select(String)
   BodyChanged(String)
@@ -46,10 +49,16 @@ pub(all) enum Msg {
 } derive(Debug)
 
 ///|
+pub extend Msg with Debug::{to_repr}
+
+///|
 struct BodyPayload {
   id : String
   body : String
 } derive(ToJson)
+
+///|
+pub extend BodyPayload with ToJson::{to_json}
 
 ///|
 struct NotePayload {
@@ -58,11 +67,17 @@ struct NotePayload {
 } derive(ToJson)
 
 ///|
+pub extend NotePayload with ToJson::{to_json}
+
+///|
 struct StatusPayload {
   id : String
   status : String
   evidence : String
 } derive(ToJson)
+
+///|
+pub extend StatusPayload with ToJson::{to_json}
 
 ///|
 pub fn app(
@@ -114,26 +129,27 @@ fn update(
           notice: "",
         }),
       )
-    BodyChanged(value) => (@rabbita.none, { ..model, body_draft: value })
-    StatusChanged(value) => (@rabbita.none, { ..model, status_draft: value })
+    BodyChanged(value) => (@rabbita.none, { ..model, body_draft: value, })
+    StatusChanged(value) => (@rabbita.none, { ..model, status_draft: value, })
     EvidenceChanged(value) =>
-      (@rabbita.none, { ..model, evidence_draft: value })
-    NoteChanged(value) => (@rabbita.none, { ..model, note_draft: value })
+      (@rabbita.none, { ..model, evidence_draft: value, })
+    NoteChanged(value) => (@rabbita.none, { ..model, note_draft: value, })
     SaveBody =>
       if !model.editable {
         (@rabbita.none, model)
       } else {
         match model.selected_id {
           Some(id) => {
-            let payload : BodyPayload = { id, body: model.body_draft }
+            let payload : BodyPayload = { id, body: model.body_draft, }
             (
               @http.post("/api/body")
               .with_json(payload)
               .expect_json(result => emit(GraphSaved(result))),
-              { ..model, notice: "Saving body..." },
+              { ..model, notice: "Saving body...", },
             )
           }
-          None => (@rabbita.none, { ..model, notice: "Select an issue first." })
+          None =>
+            (@rabbita.none, { ..model, notice: "Select an issue first.", })
         }
       }
     SaveStatus =>
@@ -141,7 +157,7 @@ fn update(
         (@rabbita.none, model)
       } else if model.status_draft == "done" &&
         model.evidence_draft.trim().to_owned() == "" {
-        (@rabbita.none, { ..model, notice: "Done status requires evidence." })
+        (@rabbita.none, { ..model, notice: "Done status requires evidence.", })
       } else {
         match model.selected_id {
           Some(id) => {
@@ -154,29 +170,31 @@ fn update(
               @http.post("/api/status")
               .with_json(payload)
               .expect_json(result => emit(GraphSaved(result))),
-              { ..model, notice: "Saving status..." },
+              { ..model, notice: "Saving status...", },
             )
           }
-          None => (@rabbita.none, { ..model, notice: "Select an issue first." })
+          None =>
+            (@rabbita.none, { ..model, notice: "Select an issue first.", })
         }
       }
     AddNote =>
       if !model.editable {
         (@rabbita.none, model)
       } else if model.note_draft.trim().to_owned() == "" {
-        (@rabbita.none, { ..model, notice: "Note must not be empty." })
+        (@rabbita.none, { ..model, notice: "Note must not be empty.", })
       } else {
         match model.selected_id {
           Some(id) => {
-            let payload : NotePayload = { id, body: model.note_draft }
+            let payload : NotePayload = { id, body: model.note_draft, }
             (
               @http.post("/api/note")
               .with_json(payload)
               .expect_json(result => emit(GraphSaved(result))),
-              { ..model, notice: "Adding note..." },
+              { ..model, notice: "Adding note...", },
             )
           }
-          None => (@rabbita.none, { ..model, notice: "Select an issue first." })
+          None =>
+            (@rabbita.none, { ..model, notice: "Select an issue first.", })
         }
       }
     GraphSaved(result) =>
@@ -192,7 +210,7 @@ fn update(
               notice: "Saved.",
             }),
           )
-        Err(_) => (@rabbita.none, { ..model, notice: "Request failed." })
+        Err(_) => (@rabbita.none, { ..model, notice: "Request failed.", })
       }
   }
 }
@@ -219,7 +237,7 @@ fn hydrate_editor(model : Model) -> Model {
           }
         None => model
       }
-    None => { ..model, body_draft: "", status_draft: "todo" }
+    None => { ..model, body_draft: "", status_draft: "todo", }
   }
 }
 
@@ -491,7 +509,7 @@ fn root_items(graph : @issues.IssueGraph) -> Array[@issues.IssueItem] {
         None => graph.items
       }
     None => {
-      let has_parent : Map[String, Unit] = {}
+      let has_parent : Map[String, Unit] = Map([])
       for edge in graph.edges {
         if edge.kind == Contains {
           has_parent[edge.to_id] = ()

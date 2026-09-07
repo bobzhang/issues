@@ -2,9 +2,9 @@
 fn sample_graph() -> @issues.IssueGraph {
   {
     items: [
-      { id: "1", title: "Build tracker", body: "", status: Todo, priority: 5 },
-      { id: "2", title: "Design schema", body: "", status: Done, priority: 3 },
-      { id: "3", title: "Implement CLI", body: "", status: Todo, priority: 8 },
+      { id: "1", title: "Build tracker", body: "", status: Todo, priority: 5, },
+      { id: "2", title: "Design schema", body: "", status: Done, priority: 3, },
+      { id: "3", title: "Implement CLI", body: "", status: Todo, priority: 8, },
       {
         id: "4",
         title: "Implement dashboard",
@@ -21,12 +21,12 @@ fn sample_graph() -> @issues.IssueGraph {
       },
     ],
     edges: [
-      { from_id: "1", to_id: "2", kind: Contains },
-      { from_id: "1", to_id: "3", kind: Contains },
-      { from_id: "1", to_id: "4", kind: Contains },
-      { from_id: "4", to_id: "5", kind: Contains },
-      { from_id: "3", to_id: "2", kind: DependsOn },
-      { from_id: "4", to_id: "3", kind: DependsOn },
+      { from_id: "1", to_id: "2", kind: Contains, },
+      { from_id: "1", to_id: "3", kind: Contains, },
+      { from_id: "1", to_id: "4", kind: Contains, },
+      { from_id: "4", to_id: "5", kind: Contains, },
+      { from_id: "3", to_id: "2", kind: DependsOn, },
+      { from_id: "4", to_id: "3", kind: DependsOn, },
     ],
     current_id: Some("1"),
   }

@@ -16,7 +16,12 @@ pub(all) enum EdgeKind {
   DependsOn
   RelatesTo
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn EdgeKind::equal(Self, Self) -> Bool
+pub fn EdgeKind::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
 pub fn EdgeKind::from_storage(String) -> Self raise
+pub fn EdgeKind::not_equal(Self, Self) -> Bool
+pub fn EdgeKind::to_json(Self) -> Json
+pub fn EdgeKind::to_repr(Self) -> @debug.Repr
 pub fn EdgeKind::to_storage(Self) -> String
 
 pub(all) struct IssueEdge {
@@ -24,6 +29,11 @@ pub(all) struct IssueEdge {
   to_id : String
   kind : EdgeKind
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn IssueEdge::equal(Self, Self) -> Bool
+pub fn IssueEdge::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn IssueEdge::not_equal(Self, Self) -> Bool
+pub fn IssueEdge::to_json(Self) -> Json
+pub fn IssueEdge::to_repr(Self) -> @debug.Repr
 
 pub(all) struct IssueGraph {
   items : Array[IssueItem]
@@ -38,15 +48,20 @@ pub fn IssueGraph::contains_children(Self, String) -> Array[IssueItem]
 pub fn IssueGraph::dependencies(Self, String) -> Array[IssueItem]
 pub fn IssueGraph::edge_count(Self, EdgeKind) -> Int
 pub fn IssueGraph::empty() -> Self
+pub fn IssueGraph::equal(Self, Self) -> Bool
 pub fn IssueGraph::find_item(Self, String) -> IssueItem?
+pub fn IssueGraph::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
 pub fn IssueGraph::has_open_child(Self, String) -> Bool
 pub fn IssueGraph::is_blocked(Self, String) -> Bool
 pub fn IssueGraph::next_todo(Self, String?) -> IssueItem?
+pub fn IssueGraph::not_equal(Self, Self) -> Bool
 pub fn IssueGraph::open_count(Self) -> Int
 pub fn IssueGraph::outline(Self, String?) -> String
 pub fn IssueGraph::ready_todos(Self, String?) -> Array[IssueItem]
 pub fn IssueGraph::ready_todos_markdown(Self, String?) -> String
 pub fn IssueGraph::scoped_items(Self, String?) -> Array[IssueItem]
+pub fn IssueGraph::to_json(Self) -> Json
+pub fn IssueGraph::to_repr(Self) -> @debug.Repr
 pub fn IssueGraph::todos_markdown(Self, String?) -> String
 
 pub(all) struct IssueItem {
@@ -56,17 +71,26 @@ pub(all) struct IssueItem {
   status : Status
   priority : Int
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn IssueItem::equal(Self, Self) -> Bool
+pub fn IssueItem::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn IssueItem::not_equal(Self, Self) -> Bool
+pub fn IssueItem::to_json(Self) -> Json
+pub fn IssueItem::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Status {
   Todo
   InProgress
   Done
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Status::equal(Self, Self) -> Bool
+pub fn Status::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
 pub fn Status::from_storage(String) -> Self raise
 pub fn Status::is_open(Self) -> Bool
+pub fn Status::not_equal(Self, Self) -> Bool
+pub fn Status::to_json(Self) -> Json
+pub fn Status::to_repr(Self) -> @debug.Repr
 pub fn Status::to_storage(Self) -> String
 
 // Type aliases
 
 // Traits
-
