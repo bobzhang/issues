@@ -115,7 +115,7 @@ async fn main {
       let status = @issues.Status::from_storage(
         get_one(sub, "status").unwrap_or("todo"),
       )
-      let priority : Int = @strconv.from_str(
+      let priority : Int = @string.parse_int(
         get_one(sub, "priority").unwrap_or("0"),
       )
       let body = get_one(sub, "body").unwrap_or("")
@@ -190,7 +190,7 @@ async fn main {
     "claim" => {
       let id = require_one(sub, "item")
       let agent = require_one(sub, "agent")
-      let ttl_minutes : Int = @strconv.from_str(
+      let ttl_minutes : Int = @string.parse_int(
         get_one(sub, "ttl-minutes").unwrap_or("0"),
       )
       claim_item(db, id, agent, ttl_minutes)
@@ -216,7 +216,7 @@ async fn main {
     }
     "events" => {
       let id = get_one(sub, "item")
-      let limit : Int = @strconv.from_str(get_one(sub, "limit").unwrap_or("20"))
+      let limit : Int = @string.parse_int(get_one(sub, "limit").unwrap_or("20"))
       println(events_view(db, id, limit))
     }
     "search" => {
@@ -242,7 +242,7 @@ async fn main {
     }
     "serve" => {
       let host = get_one(sub, "host").unwrap_or("127.0.0.1")
-      let port : Int = @strconv.from_str(get_one(sub, "port").unwrap_or("8080"))
+      let port : Int = @string.parse_int(get_one(sub, "port").unwrap_or("8080"))
       println("serving http://\{host}:\{port}")
       serve_dashboard(db, host, port)
     }
