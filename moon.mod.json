@@ -1,6 +1,6 @@
 {
   "name": "bobzhang/issues",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "deps": {
     "moonbit-community/rabbita": "0.12.2",
     "moonbitlang/async": "0.22.4",
