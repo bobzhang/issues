@@ -586,8 +586,8 @@ async fn migrate_numeric_id_db(db : String) -> Unit {
       db, "SELECT id, title, status, priority FROM items ORDER BY id;",
     ),
   )
-  let id_map : Map[String, String] = {}
-  let title_map : Map[String, String] = {}
+  let id_map : Map[String, String] = Map([])
+  let title_map : Map[String, String] = Map([])
   for row in legacy_items {
     let title = normalize_title(row.title)
     let id = issue_id_from_title(title)
@@ -877,12 +877,12 @@ async fn import_markdown_todos(
   if parent_id is Some(id) {
     ignore(require_item(db, id))
   }
-  let body = StringBuilder::new()
+  let body = StringBuilder()
   let mut count = 0
   for todo in todos {
     count += import_markdown_todo(db, parent_id, todo, 0, body)
   }
-  let report = StringBuilder::new()
+  let report = StringBuilder()
   report.write_string("imported \{count} todos\n")
   report.write_string(body.to_string())
   report.to_string()

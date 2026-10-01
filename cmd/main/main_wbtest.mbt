@@ -34,7 +34,7 @@ test "markdown task parser preserves nesting and status" {
 
 ///|
 fn markdown_todo_summary(todos : Array[MarkdownTodo]) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for todo in todos {
     write_markdown_todo_summary(todo, 0, buf)
   }
