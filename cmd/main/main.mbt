@@ -4,15 +4,15 @@ struct ItemRow {
   title : String
   body : String
   status : String
-  priority : Int
+  priority : Int32
 } derive(FromJson)
 
 ///|
 struct LegacyItemRow {
-  id : Int
+  id : Int32
   title : String
   status : String
-  priority : Int
+  priority : Int32
 } derive(FromJson)
 
 ///|
@@ -24,8 +24,8 @@ struct EdgeRow {
 
 ///|
 struct LegacyEdgeRow {
-  from_id : Int
-  to_id : Int
+  from_id : Int32
+  to_id : Int32
   kind : String
 } derive(FromJson)
 
@@ -42,14 +42,14 @@ struct ColumnRow {
 
 ///|
 struct NoteRow {
-  note_id : Int
+  note_id : Int32
   body : String
   created_at : String
 } derive(FromJson)
 
 ///|
 struct EventRow {
-  event_id : Int
+  event_id : Int32
   item_id : String
   event_type : String
   agent : String
@@ -115,7 +115,7 @@ async fn main {
       let status = @issues.Status::from_storage(
         get_one(sub, "status").unwrap_or("todo"),
       )
-      let priority : Int = @string.parse_int(
+      let priority : Int32 = @string.parse_int(
         get_one(sub, "priority").unwrap_or("0"),
       )
       let body = get_one(sub, "body").unwrap_or("")
@@ -190,7 +190,7 @@ async fn main {
     "claim" => {
       let id = require_one(sub, "item")
       let agent = require_one(sub, "agent")
-      let ttl_minutes : Int = @string.parse_int(
+      let ttl_minutes : Int32 = @string.parse_int(
         get_one(sub, "ttl-minutes").unwrap_or("0"),
       )
       claim_item(db, id, agent, ttl_minutes)
@@ -216,7 +216,9 @@ async fn main {
     }
     "events" => {
       let id = get_one(sub, "item")
-      let limit : Int = @string.parse_int(get_one(sub, "limit").unwrap_or("20"))
+      let limit : Int32 = @string.parse_int(
+        get_one(sub, "limit").unwrap_or("20"),
+      )
       println(events_view(db, id, limit))
     }
     "search" => {
@@ -242,7 +244,9 @@ async fn main {
     }
     "serve" => {
       let host = get_one(sub, "host").unwrap_or("127.0.0.1")
-      let port : Int = @string.parse_int(get_one(sub, "port").unwrap_or("8080"))
+      let port : Int32 = @string.parse_int(
+        get_one(sub, "port").unwrap_or("8080"),
+      )
       println("serving http://\{host}:\{port}")
       serve_dashboard(db, host, port)
     }
@@ -713,7 +717,7 @@ async fn add_item(
   title : String,
   body : String,
   status : @issues.Status,
-  priority : Int,
+  priority : Int32,
 ) -> String {
   init_db(db)
   let normalized_title = normalize_title(title)
@@ -893,9 +897,9 @@ async fn import_markdown_todo(
   db : String,
   parent_id : String?,
   todo : MarkdownTodo,
-  depth : Int,
+  depth : Int32,
   report : StringBuilder,
-) -> Int {
+) -> Int32 {
   let id = add_item(db, todo.title, "", todo.status, 0)
   if parent_id is Some(parent) {
     add_edge(db, parent, id, Contains)
@@ -1063,7 +1067,7 @@ async fn claim_item(
   db : String,
   id : String,
   agent : String,
-  ttl_minutes : Int,
+  ttl_minutes : Int32,
 ) -> Unit {
   init_db(db)
   ignore(require_item(db, id))
@@ -1145,7 +1149,7 @@ async fn active_claim(db : String, id : String) -> ClaimRow? {
 }
 
 ///|
-async fn load_notes(db : String, id : String, limit : Int) -> Array[NoteRow] {
+async fn load_notes(db : String, id : String, limit : Int32) -> Array[NoteRow] {
   @json.from_json(
     sqlite_json(
       db,
@@ -1155,7 +1159,11 @@ async fn load_notes(db : String, id : String, limit : Int) -> Array[NoteRow] {
 }
 
 ///|
-async fn load_events(db : String, id : String?, limit : Int) -> Array[EventRow] {
+async fn load_events(
+  db : String,
+  id : String?,
+  limit : Int32,
+) -> Array[EventRow] {
   let where_clause = match id {
     Some(value) => "WHERE item_id=\{sql_quote(value)}"
     None => ""
@@ -1332,7 +1340,7 @@ fn one_line(value : String) -> String {
 }
 
 ///|
-async fn events_view(db : String, id : String?, limit : Int) -> String {
+async fn events_view(db : String, id : String?, limit : Int32) -> String {
   init_db(db)
   match id {
     Some(value) => ignore(require_item(db, value))
@@ -1412,7 +1420,7 @@ async fn write_dashboard_files(db : String, out_dir : String) -> Unit {
 }
 
 ///|
-async fn serve_dashboard(db : String, host : String, port : Int) -> Unit {
+async fn serve_dashboard(db : String, host : String, port : Int32) -> Unit {
   init_db(db)
   let app_js = @fs.read_file(build_dashboard_app()).text()
   let addr = @socket.Addr::parse("\{host}:\{port}")
@@ -1516,7 +1524,7 @@ fn strip_query(path : String) -> String {
 ///|
 async fn send_text(
   conn : @http.ServerConnection,
-  code : Int,
+  code : Int32,
   reason : String,
   body : String,
   content_type : String,
