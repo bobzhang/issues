@@ -42,7 +42,7 @@ pub fn Status::is_open(self : Status) -> Bool {
 }
 
 ///|
-fn Status::rank_for_next(self : Status) -> Int {
+fn Status::rank_for_next(self : Status) -> Int32 {
   match self {
     InProgress => 0
     Todo => 1
@@ -94,7 +94,7 @@ pub(all) struct IssueItem {
   title : String
   body : String
   status : Status
-  priority : Int
+  priority : Int32
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
@@ -318,7 +318,7 @@ pub fn IssueGraph::all_todos_markdown(
 }
 
 ///|
-pub fn IssueGraph::open_count(self : IssueGraph) -> Int {
+pub fn IssueGraph::open_count(self : IssueGraph) -> Int32 {
   self.items.fold(init=0, (count, item) => {
     if item.status.is_open() {
       count + 1
@@ -329,7 +329,7 @@ pub fn IssueGraph::open_count(self : IssueGraph) -> Int {
 }
 
 ///|
-pub fn IssueGraph::blocked_count(self : IssueGraph) -> Int {
+pub fn IssueGraph::blocked_count(self : IssueGraph) -> Int32 {
   self.items.fold(init=0, (count, item) => {
     if item.status.is_open() && self.is_blocked(item.id) {
       count + 1
@@ -340,7 +340,7 @@ pub fn IssueGraph::blocked_count(self : IssueGraph) -> Int {
 }
 
 ///|
-pub fn IssueGraph::edge_count(self : IssueGraph, kind : EdgeKind) -> Int {
+pub fn IssueGraph::edge_count(self : IssueGraph, kind : EdgeKind) -> Int32 {
   self.edges.fold(init=0, (count, edge) => {
     if edge.kind == kind {
       count + 1
@@ -426,7 +426,7 @@ fn resolve_focus(focus : String?, current : String?) -> String? {
 fn write_outline_node(
   graph : IssueGraph,
   id : String,
-  depth : Int,
+  depth : Int32,
   buf : StringBuilder,
   seen : Map[String, Unit],
 ) -> Unit {
@@ -456,7 +456,7 @@ fn write_outline_node(
 fn write_todo_markdown_node(
   graph : IssueGraph,
   id : String,
-  depth : Int,
+  depth : Int32,
   buf : StringBuilder,
   seen : Map[String, Unit],
 ) -> Unit {
@@ -529,7 +529,7 @@ fn sort_items_for_display(items : Array[IssueItem]) -> Unit {
 }
 
 ///|
-fn compare_next_candidate(left : IssueItem, right : IssueItem) -> Int {
+fn compare_next_candidate(left : IssueItem, right : IssueItem) -> Int32 {
   let by_status = left.status
     .rank_for_next()
     .compare(right.status.rank_for_next())

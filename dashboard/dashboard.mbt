@@ -82,7 +82,7 @@ pub extend StatusPayload with ToJson::{to_json}
 ///|
 pub fn app(
   graph : @issues.IssueGraph,
-  editable? : Bool = true,
+  editable~ : Bool = true,
 ) -> @rabbita.Cell {
   @rabbita.cell(model=initial_model(graph, editable), update~, view~)
 }
@@ -287,7 +287,7 @@ fn outline_node(
   graph : @issues.IssueGraph,
   item : @issues.IssueItem,
   selected_id : String?,
-  depth : Int,
+  depth : Int32,
 ) -> @html.Html {
   let children = graph.contains_children(item.id)
   let is_selected = selected_id == Some(item.id)
