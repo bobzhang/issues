@@ -44,7 +44,7 @@ fn markdown_todo_summary(todos : Array[MarkdownTodo]) -> String {
 ///|
 fn write_markdown_todo_summary(
   todo : MarkdownTodo,
-  depth : Int,
+  depth : Int32,
   buf : StringBuilder,
 ) -> Unit {
   for _ in 0..<depth {
