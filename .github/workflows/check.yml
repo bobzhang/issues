@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+env:
+  MOON_WORK: "off"
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -20,3 +26,23 @@ jobs:
         run: moon check --deny-warn --target all
       - name: moon fmt (no diff)
         run: moon fmt --check
+      - name: Check generated interfaces
+        run: |
+          moon info --target all
+          git diff --exit-code
+      - name: Test supported backends
+        run: |
+          moon test --target all
+          moon test --target all --release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install browser test dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+      - name: Test live and exported dashboards
+        run: npm run test:dashboard
