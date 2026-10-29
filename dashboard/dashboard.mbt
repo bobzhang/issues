@@ -30,10 +30,13 @@ pub(all) struct Model {
   evidence_draft : String
   note_draft : String
   notice : String
-} derive(Debug)
+} derive(Eq, Debug)
 
 ///|
 pub extend Model with Debug::{to_repr}
+
+///|
+pub extend Model with Eq::{equal, not_equal}
 
 ///|
 pub(all) enum Msg {
@@ -83,13 +86,29 @@ pub extend StatusPayload with ToJson::{to_json}
 pub fn app(
   graph : @issues.IssueGraph,
   editable~ : Bool = true,
-) -> @rabbita.Cell {
-  @rabbita.cell(model=initial_model(graph, editable), update~, view~)
+) -> () -> @rabbita.Val[@html.Html] {
+  fn() {
+    let (model, emit) = @rabbita.create_state(initial_model(graph, editable), update=(
+      model,
+      msg,
+      emit,
+    ) => {
+      let (cmd, next_model) = update(emit, msg, model)
+      (next_model, cmd)
+    })
+    model.view(model => view(emit, model))
+  }
 }
 
 ///|
 pub fn render_static(graph : @issues.IssueGraph) -> String {
-  @rabbita.render_to_string(app(graph, editable=false))
+  // The synchronous renderer has no browser state context. Render the same
+  // read-only view directly instead of constructing an interactive state node.
+  @rabbita.render_to_string(() => {
+    @rabbita.Val::constant(
+      view(_ => @rabbita.none, initial_model(graph, false)),
+    )
+  })
 }
 
 ///|
@@ -450,7 +469,6 @@ fn note_editor(emit : @rabbita.Emit[Msg], model : Model) -> @html.Html {
       placeholder="Append an event note.",
       on_input=value => emit(NoteChanged(value)),
       style=input_style(),
-      nothing,
     ),
     div(style=action_row_style(), [
       button(on_click=emit(AddNote), style=secondary_button_style(), "Add note"),
