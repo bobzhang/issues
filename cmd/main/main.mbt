@@ -1,53 +1,61 @@
 ///|
+#derive(FromJson)
 struct ItemRow {
   id : String
   title : String
   body : String
   status : String
   priority : Int32
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct LegacyItemRow {
   id : Int32
   title : String
   status : String
   priority : Int32
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct EdgeRow {
   from_id : String
   to_id : String
   kind : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct LegacyEdgeRow {
   from_id : Int32
   to_id : Int32
   kind : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct ExistingItemRow {
   id : String
   title : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct ColumnRow {
   name : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct NoteRow {
   note_id : Int32
   body : String
   created_at : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct EventRow {
   event_id : Int32
   item_id : String
@@ -55,46 +63,52 @@ struct EventRow {
   agent : String
   body : String
   created_at : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct ClaimRow {
   item_id : String
   agent : String
   claimed_at : String
   lease_until : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct StateRow {
   value : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct BodyPayload {
   id : String
   body : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct NotePayload {
   id : String
   body : String
-} derive(FromJson)
+}
 
 ///|
+#derive(FromJson)
 struct StatusPayload {
   id : String
   status : String
   evidence : String
-} derive(FromJson)
+}
 
 ///|
+#derive(Debug)
 struct MarkdownTodo {
   title : String
   status : @issues.Status
   children : Array[MarkdownTodo]
-} derive(Debug)
+}
 
 ///|
 async fn main {
@@ -772,7 +786,7 @@ fn normalize_title(title : String) -> String {
 fn issue_id_from_title(title : String) -> String {
   let digest = @crypto.sha256(@utf8.encode(title))
   let hex = @crypto.bytes_to_hex_string(digest)
-  "iss_" + hex.view(end_offset=16).to_owned()
+  "iss_" + hex.exact_view(end=16).to_owned()
 }
 
 ///|

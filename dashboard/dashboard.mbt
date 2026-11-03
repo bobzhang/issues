@@ -21,6 +21,7 @@ using @html {
 }
 
 ///|
+#derive(Eq, Debug)
 pub(all) struct Model {
   graph : @issues.IssueGraph
   selected_id : String?
@@ -30,7 +31,7 @@ pub(all) struct Model {
   evidence_draft : String
   note_draft : String
   notice : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Model with Debug::{to_repr}
@@ -39,6 +40,7 @@ pub extend Model with Debug::{to_repr}
 pub extend Model with Eq::{equal, not_equal}
 
 ///|
+#derive(Debug)
 pub(all) enum Msg {
   Select(String)
   BodyChanged(String)
@@ -49,35 +51,38 @@ pub(all) enum Msg {
   SaveStatus
   AddNote
   GraphSaved(Result[@issues.IssueGraph, Error])
-} derive(Debug)
+}
 
 ///|
 pub extend Msg with Debug::{to_repr}
 
 ///|
+#derive(ToJson)
 struct BodyPayload {
   id : String
   body : String
-} derive(ToJson)
+}
 
 ///|
 pub extend BodyPayload with ToJson::{to_json}
 
 ///|
+#derive(ToJson)
 struct NotePayload {
   id : String
   body : String
-} derive(ToJson)
+}
 
 ///|
 pub extend NotePayload with ToJson::{to_json}
 
 ///|
+#derive(ToJson)
 struct StatusPayload {
   id : String
   status : String
   evidence : String
-} derive(ToJson)
+}
 
 ///|
 pub extend StatusPayload with ToJson::{to_json}
