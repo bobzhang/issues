@@ -1,9 +1,10 @@
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum Status {
   Todo
   InProgress
   Done
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Status with Eq::{not_equal, equal}
@@ -51,11 +52,12 @@ fn Status::rank_for_next(self : Status) -> Int32 {
 }
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) enum EdgeKind {
   Contains
   DependsOn
   RelatesTo
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend EdgeKind with Eq::{not_equal, equal}
@@ -89,13 +91,14 @@ pub fn EdgeKind::to_storage(self : EdgeKind) -> String {
 }
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct IssueItem {
   id : String
   title : String
   body : String
   status : Status
   priority : Int32
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend IssueItem with Eq::{not_equal, equal}
@@ -110,11 +113,12 @@ pub extend IssueItem with ToJson::{to_json}
 pub extend IssueItem with @json.FromJson::{from_json}
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct IssueEdge {
   from_id : String
   to_id : String
   kind : EdgeKind
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend IssueEdge with Eq::{not_equal, equal}
@@ -129,11 +133,12 @@ pub extend IssueEdge with ToJson::{to_json}
 pub extend IssueEdge with @json.FromJson::{from_json}
 
 ///|
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct IssueGraph {
   items : Array[IssueItem]
   edges : Array[IssueEdge]
   current_id : String?
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend IssueGraph with Eq::{not_equal, equal}

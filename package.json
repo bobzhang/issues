@@ -1,0 +1,10 @@
+{
+  "name": "issues-dashboard-tests",
+  "private": true,
+  "scripts": {
+    "test:dashboard": "node scripts/test-dashboard.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

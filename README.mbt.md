@@ -106,11 +106,25 @@ mutation endpoint.
 ## Validation
 
 ```bash
-moon test --target native
-moon test --target js
-moon check --target native
-moon check --target js
+moon check --target all --deny-warn
+moon test --target all
+moon test --target all --release
+moon info --target all
+moon fmt --check
 ```
+
+The browser regression test requires Node.js and SQLite's `sqlite3` command. It
+builds the CLI, uses a temporary database, and checks editing in the live viewer
+and navigation in a read-only file export:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:dashboard
+```
+
+The dashboard uses Rabbita 0.14.3's component state API. This release also retains
+the synchronous renderer used by the public `render_static` helper.
 
 ## Executable CLI Docs
 
