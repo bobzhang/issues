@@ -123,8 +123,10 @@ npx playwright install chromium
 npm run test:dashboard
 ```
 
-The dashboard uses Rabbita 0.14.3's component state API. This release also retains
-the synchronous renderer used by the public `render_static` helper.
+The dashboard uses Rabbita's component state API. Its public `render_static`
+helper remains synchronous and targets JavaScript. The proposed Rabbita 0.17
+upgrade requires a compatible public synchronous renderer; the newer native-only
+async `App::render` API cannot replace it without an API and target change.
 
 ## Executable CLI Docs
 
