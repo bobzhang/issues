@@ -1,6 +1,6 @@
 name = "bobzhang/issues"
 
-version = "0.1.9"
+version = "0.1.10"
 
 import {
   "moonbit-community/casefold@0.1.7",

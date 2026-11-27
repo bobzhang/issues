@@ -281,7 +281,7 @@ fn cli_command() -> @argparse.Command {
   @argparse.Command(
     "issues",
     about="SQLite-backed DAG issue tracker for agents and humans.",
-    version="0.1.9",
+    version="0.1.10",
     subcommand_required=true,
     options=[
       @argparse.OptionArg(
