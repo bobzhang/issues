@@ -123,8 +123,14 @@ npx playwright install chromium
 npm run test:dashboard
 ```
 
-The dashboard uses Rabbita 0.14.3's component state API. This release also retains
-the synchronous renderer used by the public `render_static` helper.
+The dashboard uses Rabbita's component state API. Its public `render_static`
+helper remains synchronous and targets JavaScript. It uses Rabbita 0.17.2's
+`Html::render_to_string` API, reusing Rabbita's escaping without a browser DOM,
+an async application host, or a document type declaration.
+
+The existing cmark 0.4.8 dependency is retained. Upgrading to 0.4.17 changes the
+interpretation of six-space-indented nested task lists and fails the existing
+Markdown import regression; that compatibility change needs separate review.
 
 ## Executable CLI Docs
 

@@ -109,11 +109,7 @@ pub fn app(
 pub fn render_static(graph : @issues.IssueGraph) -> String {
   // The synchronous renderer has no browser state context. Render the same
   // read-only view directly instead of constructing an interactive state node.
-  @rabbita.render_to_string(() => {
-    @rabbita.Val::constant(
-      view(_ => @rabbita.none, initial_model(graph, false)),
-    )
-  })
+  view(_ => @rabbita.none, initial_model(graph, false)).render_to_string()
 }
 
 ///|
