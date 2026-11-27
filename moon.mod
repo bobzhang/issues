@@ -6,8 +6,8 @@ import {
   "moonbit-community/casefold@0.1.7",
   "moonbit-community/cmark@0.4.8",
   "moonbit-community/rabbita@0.17.0",
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/x@0.5.5",
+  "moonbitlang/async@0.22.10",
+  "moonbitlang/x@0.5.9",
 }
 
 readme = "README.mbt.md"

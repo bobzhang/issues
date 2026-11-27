@@ -500,7 +500,7 @@ fn require_one(matches : @argparse.Matches, name : String) -> String {
 ///|
 fn[A] cli_fail(message : String) -> A {
   println(message)
-  @sys.exit(1)
+  @env.exit(1)
   panic()
 }
 
