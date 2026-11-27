@@ -156,8 +156,8 @@ column.
 ```scrut
 $ cat > "$TMPDIR"/markdown-plan.md <<'EOF'
 > - [ ] Batch root
->       - [x] Batch child done
->       - [ ] Batch child open
+>   - [x] Batch child done
+>   - [ ] Batch child open
 > EOF
 > issues import-markdown "$TMPDIR"/markdown-plan.md | sed '/^$/d'
 imported 3 todos

@@ -13,23 +13,27 @@ test "issue title is normalized before hashing" {
 
 ///|
 test "markdown task parser preserves nesting and status" {
-  let source =
-    #|- [ ] Build tracker
-    #|      - [x] Implement CLI
-    #|      - [ ] Implement dashboard
-    #|            - [ ] Wire Rabbit Tea controls
-    #|
-  let todos = markdown_todos_from_string(source)
-  inspect(
-    markdown_todo_summary(todos),
-    content=(
-      #|- Build tracker [todo]
-      #|  - Implement CLI [done]
-      #|  - Implement dashboard [todo]
-      #|    - Wire Rabbit Tea controls [todo]
-      #|
-    ),
-  )
+  for indent in ["  ", "    "] {
+    let source = "- [ ] Build tracker\n" +
+      indent +
+      "- [x] Implement CLI\n" +
+      indent +
+      "- [ ] Implement dashboard\n" +
+      indent +
+      indent +
+      "- [ ] Wire Rabbit Tea controls\n"
+    let todos = markdown_todos_from_string(source)
+    inspect(
+      markdown_todo_summary(todos),
+      content=(
+        #|- Build tracker [todo]
+        #|  - Implement CLI [done]
+        #|  - Implement dashboard [todo]
+        #|    - Wire Rabbit Tea controls [todo]
+        #|
+      ),
+    )
+  }
 }
 
 ///|

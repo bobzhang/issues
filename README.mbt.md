@@ -45,12 +45,12 @@ for flat filtered lists.
 
 ```markdown
 - [ ] Build tracker
-      - [x] Implement CLI
-      - [ ] Implement dashboard
+  - [x] Implement CLI
+  - [ ] Implement dashboard
 ```
 
-Nested task bullets should be indented to the parent item content column; after
-`- [ ] Parent`, that means six spaces before the child `-`. Use
+Nested task bullets use ordinary list indentation: use two spaces per level
+for `-` bullets, as above. The `[ ]` checkbox does not add to the indentation. Use
 `--parent <issue-id>` to attach imported top-level tasks under an existing issue.
 
 Larger-agent workflows have mutable details, notes, claims, done evidence, search,
@@ -128,9 +128,12 @@ helper remains synchronous and targets JavaScript. It uses Rabbita 0.17.2's
 `Html::render_to_string` API, reusing Rabbita's escaping without a browser DOM,
 an async application host, or a document type declaration.
 
-The existing cmark 0.4.8 dependency is retained. Upgrading to 0.4.17 changes the
-interpretation of six-space-indented nested task lists and fails the existing
-Markdown import regression; that compatibility change needs separate review.
+cmark 0.4.17 corrects task-list continuation indentation to match ordinary
+Markdown lists. Before importing files written using the old six-space-per-level
+example, change task-list indentation to two spaces per level. Otherwise deeply
+indented bullets can become paragraph continuation or code instead of child tasks.
+Do not change indentation inside fenced or indented code blocks. Existing issues
+in the SQLite database are unaffected.
 
 ## Executable CLI Docs
 
