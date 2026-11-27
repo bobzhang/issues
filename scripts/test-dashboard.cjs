@@ -91,8 +91,9 @@ async function main() {
       await page.getByRole('button', { name: button, exact: true }).click();
       const response = await responsePromise;
       assert.equal(response.status(), 200, `${endpoint} succeeds`);
+      const graph = await response.json();
       await page.getByText('Saved.', { exact: true }).waitFor();
-      return response.json();
+      return graph;
     }
     const updatedBody = 'Body edited through the browser <not markup> & persisted';
     await body.fill(updatedBody);
