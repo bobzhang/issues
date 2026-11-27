@@ -124,11 +124,9 @@ npm run test:dashboard
 ```
 
 The dashboard uses Rabbita's component state API. Its public `render_static`
-helper remains synchronous and targets JavaScript. This branch adapts it to the
-proposed `Html::render_to_string` API, reusing Rabbita's escaping without a browser
-DOM, an async application host, or a document type declaration. Rabbita 0.17.0
-does not yet include that API: this draft requires the upstream change and a new
-published dependency version before it can be merged.
+helper remains synchronous and targets JavaScript. It uses Rabbita 0.17.2's
+`Html::render_to_string` API, reusing Rabbita's escaping without a browser DOM,
+an async application host, or a document type declaration.
 
 The existing cmark 0.4.8 dependency is retained. Upgrading to 0.4.17 changes the
 interpretation of six-space-indented nested task lists and fails the existing

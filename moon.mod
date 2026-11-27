@@ -1,11 +1,11 @@
 name = "bobzhang/issues"
 
-version = "0.1.8"
+version = "0.1.9"
 
 import {
   "moonbit-community/casefold@0.1.7",
   "moonbit-community/cmark@0.4.8",
-  "moonbit-community/rabbita@0.17.0",
+  "moonbit-community/rabbita@0.17.2",
   "moonbitlang/async@0.22.10",
   "moonbitlang/x@0.5.9",
 }
